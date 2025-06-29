@@ -31,11 +31,61 @@ partial class Form1
     /// </summary>
     private void InitializeComponent()
     {
-        this.components = new System.ComponentModel.Container();
-        this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(800, 450);
-        this.Text = "Form1";
+        textBox1 = new System.Windows.Forms.TextBox();
+        CompileButton = new System.Windows.Forms.Button();
+        ExecuteButton = new System.Windows.Forms.Button();
+        SuspendLayout();
+        // 
+        // textBox1
+        // 
+        textBox1.Dock = System.Windows.Forms.DockStyle.Bottom;
+        textBox1.Location = new System.Drawing.Point(0, 44);
+        textBox1.Margin = new System.Windows.Forms.Padding(3, 10, 3, 3);
+        textBox1.Multiline = true;
+        textBox1.Name = "textBox1";
+        textBox1.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+        textBox1.Size = new System.Drawing.Size(784, 494);
+        textBox1.TabIndex = 0;
+        // 
+        // CompileButton
+        // 
+        CompileButton.Location = new System.Drawing.Point(10, 6);
+        CompileButton.Name = "CompileButton";
+        CompileButton.Size = new System.Drawing.Size(131, 34);
+        CompileButton.TabIndex = 1;
+        CompileButton.Text = "Скомпилировать!";
+        CompileButton.UseVisualStyleBackColor = true;
+        CompileButton.Click += CompileButton_Click;
+        // 
+        // ExecuteButton
+        // 
+        ExecuteButton.Location = new System.Drawing.Point(158, 6);
+        ExecuteButton.Name = "ExecuteButton";
+        ExecuteButton.Size = new System.Drawing.Size(131, 34);
+        ExecuteButton.TabIndex = 2;
+        ExecuteButton.Text = "Запуск!";
+        ExecuteButton.UseVisualStyleBackColor = true;
+        // 
+        // Form1
+        // 
+        AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+        AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+        AutoSize = true;
+        ClientSize = new System.Drawing.Size(784, 538);
+        Controls.Add(ExecuteButton);
+        Controls.Add(CompileButton);
+        Controls.Add(textBox1);
+        Text = "Form1";
+        WindowState = System.Windows.Forms.FormWindowState.Minimized;
+        ResumeLayout(false);
+        PerformLayout();
     }
+
+    private System.Windows.Forms.Button ExecuteButton;
+
+    private System.Windows.Forms.Button CompileButton;
+
+    private System.Windows.Forms.TextBox textBox1;
 
     #endregion
 }
