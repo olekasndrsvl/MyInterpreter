@@ -1,4 +1,4 @@
-namespace MyInterpreter;
+﻿namespace MyInterpreter;
 
 public partial class Form1 : Form
 {
