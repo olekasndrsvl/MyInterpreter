@@ -123,7 +123,7 @@ public class Lexer: LexerBase
     private Token GetIdentifier(Position startPos)
     {
         while (IsAlphaNumeric(PeekChar()))
-        {
+        { 
             NextChar();
         }
 
@@ -171,7 +171,7 @@ public class Lexer: LexerBase
     public Token NextToken()
     {
         var c = NextChar();
-        while (c == (char)13 || c == (char)7 || c == ' ' || c == (char)10)
+        while (c == (char)13 || c == (char)7 || c == ' ' || c == (char)10) //пропуск пробелов/табов
             c = NextChar();
         var pos = CurrentPosition();
         start = cur - 1;
@@ -234,10 +234,11 @@ public class Lexer: LexerBase
                     }
                     else
                     {
-                        throw new ComplierExceptions.LexerException($"Неверный символ {PeekChar()} после |",
+                        ComplierExceptions.LexerError($"Неверный символ {PeekChar()} после |",
                             CurrentPosition()
                         );
                     }
+                    break;
                 case '"':
                     return GetString(pos);
                 default:
@@ -251,9 +252,10 @@ public class Lexer: LexerBase
                     }
                     else
                     {
-                        throw new ComplierExceptions.LexerException(
+                        ComplierExceptions.LexerError(
                             $"Неизвестный символ {c} в позиции {pos.Line},{pos.Column}", pos);
                     }
+                    break;
         }
         return new Token(TokenType.Eof,pos,"Eof");
     }

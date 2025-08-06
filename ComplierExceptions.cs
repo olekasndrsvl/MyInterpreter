@@ -12,13 +12,18 @@ public class Position
         Line = line;
         Column = column;
     }
+
+    public override string ToString()
+    {
+        return $"({Line}, {Column})";
+    }
 }
 public class ComplierExceptions
 {
     public class BaseCompilerException : Exception
     {
         public Position Pos;
-        public BaseCompilerException(string message, Position p =null) : base(message) { }
+        public BaseCompilerException(string message, Position p =null) : base(message) { Pos = p; }
     }
 
     public class LexerException : BaseCompilerException
@@ -40,6 +45,7 @@ public class ComplierExceptions
     // Выброс ошибок объявленных выше
     public static void LexerError(string msg, Position pos)
     {
+       
         throw new LexerException(msg, pos);
     }
 
@@ -61,9 +67,11 @@ public class ComplierExceptions
         var line = lines[e.Pos.Line-1];
         sb.Append(line);
         sb.Append('\n');
-        sb.Append(' '*(e.Pos.Column-1) + '^');
+        for (var i = 0; i < e.Pos.Column - 1; i++)
+            sb.Append(' ');
+        sb.Append('^');
         sb.Append('\n');
-        sb.Append(prefix + ' ' + e.Pos.ToString + ':' + e.Message);
+        sb.Append(prefix + ' ' + e.Pos.ToString() + ':' + e.Message);
         sb.Append('\n');
         return sb.ToString();
     }
