@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace MyInterpreter;
 public class TokenBase
@@ -160,7 +161,7 @@ public class Lexer: LexerBase
             }
 
             var value = code[start..cur];
-            var re = double.Parse(value);
+            var re = double.Parse(value, CultureInfo.InvariantCulture);
             return new Token(TokenType.DoubleLiteral, startPos, re);
         }
         var _value = code[start..cur];

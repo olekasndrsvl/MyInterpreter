@@ -2,8 +2,14 @@
 
 public class ASTNodes
 {
+    public static class RuntimeEnvironment
+    {
+        public static Dictionary<string, double> VarValues = new Dictionary<string, double>();
+    }
+
     public class Node
     {
+        public Position pos { get; set; }
         public virtual void Visit<T>(IVisitor<T> visitor)
         {
             visitor.VisitNode(this);
@@ -17,6 +23,7 @@ public class ASTNodes
    
     public class ExprNode : Node
     {
+        public virtual double Eval() => 0;
         public override void Visit<T>(IVisitor<T> visitor)
         {
             visitor.VisitExprNode(this);
@@ -30,6 +37,10 @@ public class ASTNodes
     
     public class StatementNode : Node
     {
+        public virtual void Execute()
+        {
+            
+        }
         public override void Visit<T>(IVisitor<T> visitor)
         {
             visitor.VisitStatementNode(this);
@@ -44,9 +55,9 @@ public class ASTNodes
     {
         public ExprNode Left { get; set; }
         public ExprNode Right { get; set; }
-        public string Operator { get; set; }
+        public char Operator { get; set; }
 
-        public BinOpNode(ExprNode left, ExprNode right, string op)
+        public BinOpNode(ExprNode left, ExprNode right, char op)
         {
             Left = left;
             Right = right;
@@ -60,6 +71,20 @@ public class ASTNodes
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitBinOp(this);
+        }
+        public override double Eval()
+        {
+            double l = Left.Eval();
+            double r = Right.Eval();
+
+            return Operator switch
+            {
+                '+' => l + r,
+                '*' => l * r,
+                '/' => l / r,
+                '<' => l < r ? 1 : 0,
+                _ => throw new Exception($"Unknown operator: {Operator}")
+            };
         }
     } 
     public class ExprListNode: ExprNode
@@ -83,6 +108,14 @@ public class ASTNodes
     {
         public List<StatementNode> lst = new List<StatementNode>();
 
+        public override void Execute()
+        {
+            foreach (var st in lst)
+            {
+                st.Execute();  
+            }
+        }
+        
         public void Add(StatementNode statement)
         {
             lst.Add(statement);
@@ -114,6 +147,7 @@ public class ASTNodes
         {
             visitor.VisitInt(this);
         }
+        public override double Eval() => value;
     }
     public class DoubleNode : ExprNode
     {
@@ -132,6 +166,7 @@ public class ASTNodes
         {
             visitor.VisitDouble(this);
         }
+        public override double Eval() => value;
     }
     public class IdNode:ExprNode
     {
@@ -150,6 +185,15 @@ public class ASTNodes
         {
             visitor.VisitId(this);
         }
+
+        public override double Eval()
+        {
+            if (RuntimeEnvironment.VarValues.TryGetValue(Name, out double value))
+            {
+                return value;
+            }
+            return 0; // Или бросить исключение
+        }
     }
   
     public class AssignNode :StatementNode
@@ -162,7 +206,30 @@ public class ASTNodes
             Ident = ident;
             Expr = expr;
         }
-        
+        public override void Execute()
+        {
+            RuntimeEnvironment.VarValues[Ident.Name] = Expr.Eval();
+        }
+    }
+    
+    public class AssignPlusNode : StatementNode
+    {
+        public IdNode Ident { get; }
+        public ExprNode Expr { get; }
+
+        public AssignPlusNode(IdNode ident, ExprNode expr, Position pos)
+        {
+            Ident = ident;
+            Expr = expr;
+            this.pos = pos;
+        }
+
+        public override void Execute()
+        {
+            string name = Ident.Name;
+            double current = RuntimeEnvironment.VarValues.TryGetValue(name, out double value) ? value : 0;
+            RuntimeEnvironment.VarValues[name] = current + Expr.Eval();
+        }
     }
     public class IfNode : StatementNode
     {
@@ -185,6 +252,17 @@ public class ASTNodes
         {
             visitor.VisitIf(this);
         }
+        public override void Execute()
+        {
+            if (Condition.Eval() > 0)
+            {
+                ThenStat.Execute();
+            }
+            else if (ElseStat != null)
+            {
+                ElseStat.Execute();
+            }
+        }
     }
     public class WhileNode :StatementNode
     {
@@ -204,6 +282,13 @@ public class ASTNodes
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitWhile(this);
+        }
+        public override void Execute()
+        {
+            while (Condition.Eval() > 0)
+            {
+                Stat.Execute();
+            }
         }
     }
     public class ProcCallNode : StatementNode
@@ -225,8 +310,17 @@ public class ASTNodes
         {
             visitor.VisitProcCall(this);
         }
+        public override void Execute()
+        {
+            //встроенные процедуры
+            if (Name.Name.Equals("print", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine(Pars.lst[0].Eval());
+                
+            }
+        }
     }
-    public class FuncCallNode :StatementNode
+    public class FuncCallNode :ExprNode
     {
        public IdNode Name { get; set; }
        public ExprListNode Pars { get; set; }
@@ -244,6 +338,11 @@ public class ASTNodes
        public override void Visit(IVisitorP visitor)
        {
            visitor.VisitFuncCall(this);
+       }
+       public override double Eval()
+       {
+           // Реализация вызова функций (если требуется)
+           return 0;
        }
     }
    
@@ -284,7 +383,7 @@ public class ASTNodes
     public static class ASTBuilder
     {
        
-        public static BinOpNode Bin(ExprNode left, string op, ExprNode right) 
+        public static BinOpNode Bin(ExprNode left, char op, ExprNode right) 
             => new BinOpNode(left, right, op);
     
       

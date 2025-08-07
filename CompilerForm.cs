@@ -55,17 +55,12 @@ namespace MyInterpreter
              private void CompileButton_Click(object sender, EventArgs e)
              {
                  Lexer lex =new Lexer(codeTextBox.Text);
+             
+                 
                  try
                  {
-                   
-                     Token t;
-                     var sb = new StringBuilder("");
-                     t = lex.NextToken();
-                     while (t.type != TokenType.Eof)
-                     {
-                         t= lex.NextToken();
-                     }
-                     
+                     Parser parser = new Parser(lex);
+                     var progr = parser.MainProgram();
                      outputTextBox.Text = "Компиляция завершена! Ошибок: 0";
                      
                  }
@@ -80,7 +75,23 @@ namespace MyInterpreter
              // Кнопка запуска
              private void RunButton_Click(object sender, EventArgs e)
              {
-                 outputTextBox.Text = "Программа выполняется...\nРезультат: Hello World!";
+                 Lexer lex =new Lexer(codeTextBox.Text);
+             
+                 
+                 try
+                 {
+                     Parser parser = new Parser(lex);
+                     var progr = parser.MainProgram();
+                     progr.Execute();
+                     outputTextBox.Text = "Компиляция завершена! Ошибок: 0";
+                     
+                 }
+                 catch (ComplierExceptions.BaseCompilerException ex)
+                 {
+                     outputTextBox.Text = ComplierExceptions.OutPutError(ex.GetType().ToString(), ex, lex.Lines);
+                     //  MessageBox.Show();
+                 }
+                 
              }
      
              // Кнопка рефакторинга
