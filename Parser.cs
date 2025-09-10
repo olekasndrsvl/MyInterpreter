@@ -125,7 +125,7 @@ public class Parser: ParserBase
     }
     
     // StatementList := Statement (';' Statement)*
-    public ASTNodes.StatementNode StatementList()
+    public ASTNodes.StatementListNode StatementList()
     {
         var stl = new ASTNodes.StatementListNode();
         stl.Add(Statement());

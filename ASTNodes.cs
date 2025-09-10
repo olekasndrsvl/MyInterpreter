@@ -10,10 +10,7 @@ public class ASTNodes
     public class Node
     {
         public Position pos { get; set; }
-        public virtual void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitNode(this);
-        }
+        public virtual T Visit<T>(IVisitor<T> visitor)=> visitor.VisitNode(this);
 
         public virtual void Visit(IVisitorP visitor)
         {
@@ -24,11 +21,8 @@ public class ASTNodes
     public class ExprNode : Node
     {
         public virtual double Eval() => 0;
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitExprNode(this);
-        }
-
+        
+        public override T Visit<T>(IVisitor<T> visitor) => visitor.VisitExprNode(this);
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitExprNode(this);
@@ -41,10 +35,8 @@ public class ASTNodes
         {
             
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitStatementNode(this);
-        }
+        public override T Visit<T>(IVisitor<T> visitor) => visitor.VisitStatementNode(this);
+       
 
         public override void Visit(IVisitorP visitor)
         {
@@ -63,11 +55,8 @@ public class ASTNodes
             Right = right;
             Operator = op;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitBinOp(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) => visitor.VisitBinOp(this);
+     
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitBinOp(this);
@@ -94,11 +83,7 @@ public class ASTNodes
         {
             lst.Add(statement);
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitExprList(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) => visitor.VisitExprList(this);
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitExprList(this);
@@ -120,11 +105,8 @@ public class ASTNodes
         {
             lst.Add(statement);
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitStatementList(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) => visitor.VisitStatementList(this);
+        
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitStatementList(this);
@@ -138,11 +120,8 @@ public class ASTNodes
         {
             this.value = value;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitInt(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) =>    visitor.VisitInt(this);
+     
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitInt(this);
@@ -157,10 +136,7 @@ public class ASTNodes
         {
             this.value = value;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitDouble(this);
-        }
+        public override T Visit<T>(IVisitor<T> visitor) =>   visitor.VisitDouble(this);
 
         public override void Visit(IVisitorP visitor)
         {
@@ -176,10 +152,7 @@ public class ASTNodes
         {
             Name = name;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitId(this);
-        }
+        public override T Visit<T>(IVisitor<T> visitor) =>   visitor.VisitId(this);
 
         public override void Visit(IVisitorP visitor)
         {
@@ -206,6 +179,7 @@ public class ASTNodes
             Ident = ident;
             Expr = expr;
         }
+        public override T Visit<T>(IVisitor<T> visitor) =>   visitor.VisitAssign(this);
         public override void Execute()
         {
             RuntimeEnvironment.VarValues[Ident.Name] = Expr.Eval();
@@ -243,11 +217,7 @@ public class ASTNodes
             ThenStat = thenStat;
             ElseStat = elseStat;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitIf(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) =>visitor.VisitIf(this);
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitIf(this);
@@ -274,11 +244,7 @@ public class ASTNodes
             Condition = condition;
             Stat = stat;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitWhile(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) =>  visitor.VisitWhile(this);
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitWhile(this);
@@ -301,11 +267,7 @@ public class ASTNodes
             Name = name;
             Pars = pars;
         }
-        public override void Visit<T>(IVisitor<T> visitor)
-        {
-            visitor.VisitProcCall(this);
-        }
-
+        public override T Visit<T>(IVisitor<T> visitor) => visitor.VisitProcCall(this);
         public override void Visit(IVisitorP visitor)
         {
             visitor.VisitProcCall(this);
@@ -316,7 +278,7 @@ public class ASTNodes
             if (Name.Name.Equals("print", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine(Pars.lst[0].Eval());
-                
+                CompilerForm.Instance.ChangeOutputBoxText( Pars.lst[0].Eval().ToString()+"\n");
             }
         }
     }
@@ -330,11 +292,7 @@ public class ASTNodes
            Name = name;
            Pars = pars;
        }
-       public override void Visit<T>(IVisitor<T> visitor)
-       {
-           visitor.VisitFuncCall(this);
-       }
-
+       public override T Visit<T>(IVisitor<T> visitor) =>  visitor.VisitFuncCall(this);
        public override void Visit(IVisitorP visitor)
        {
            visitor.VisitFuncCall(this);

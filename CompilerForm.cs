@@ -2,17 +2,31 @@
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
-
+using static MyInterpreter.RefactorVisitor;
 namespace MyInterpreter
 {
     public partial class CompilerForm : Form
     {
+        public static CompilerForm Instance;
         public CompilerForm()
         {
             InitializeComponent();
+            Instance = this;
         }
 
-      private void MainForm_Load(object sender, EventArgs e)
+        public void ChangeOutputBoxText(string text)
+        {
+         //   outputTextBox.Text = text;
+            if (outputTextBox.InvokeRequired)
+            {
+                outputTextBox.Invoke(new Action<string>(ChangeOutputBoxText), outputTextBox.Text+text);
+            }
+            else
+            {
+                outputTextBox.Text = outputTextBox.Text+ text;
+            }
+        }
+        private void MainForm_Load(object sender, EventArgs e)
              {
                  outputTextBox.BackColor = Color.LightGray;
                  outputTextBox.ReadOnly = true;
@@ -56,12 +70,12 @@ namespace MyInterpreter
              {
                  Lexer lex =new Lexer(codeTextBox.Text);
              
-                 
+                 outputTextBox.Clear();
                  try
                  {
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
-                     outputTextBox.Text = "Компиляция завершена! Ошибок: 0";
+                     outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
                      
                  }
                  catch (ComplierExceptions.BaseCompilerException ex)
@@ -69,12 +83,14 @@ namespace MyInterpreter
                      outputTextBox.Text = ComplierExceptions.OutPutError(ex.GetType().ToString(), ex, lex.Lines);
                      //  MessageBox.Show();
                  }
+                 
 
              }
      
              // Кнопка запуска
              private void RunButton_Click(object sender, EventArgs e)
              {
+                 outputTextBox.Clear();
                  Lexer lex =new Lexer(codeTextBox.Text);
              
                  
@@ -82,8 +98,9 @@ namespace MyInterpreter
                  {
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
+                     outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
                      progr.Execute();
-                     outputTextBox.Text = "Компиляция завершена! Ошибок: 0";
+                     
                      
                  }
                  catch (ComplierExceptions.BaseCompilerException ex)
@@ -97,7 +114,24 @@ namespace MyInterpreter
              // Кнопка рефакторинга
              private void RefactorButton_Click(object sender, EventArgs e)
              {
-                 outputTextBox.Text = "Код отрефакторен!";
+                 Lexer lex =new Lexer(codeTextBox.Text);
+             
+                 
+                 try
+                 {
+                     Parser parser = new Parser(lex);
+                     var progr = parser.MainProgram();
+                     var pp = new RefactorVisitor();
+                     codeTextBox.Text = progr.Visit(pp);
+                   //  Console.WriteLine(progr.Visit(pp));
+                     outputTextBox.Text = "Код отрефакторен!";
+                 }
+                 catch (ComplierExceptions.BaseCompilerException ex)
+                 {
+                     outputTextBox.Text = ComplierExceptions.OutPutError(ex.GetType().ToString(), ex, lex.Lines);
+                     //  MessageBox.Show();
+                 }
+                 
              }
     }
 }
