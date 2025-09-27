@@ -116,7 +116,7 @@ partial class CompilerForm
                 this.refactorButton.Name = "refactorButton";
                 this.refactorButton.Size = new System.Drawing.Size(100, 30);
                 this.refactorButton.TabIndex = 3;
-                this.refactorButton.Text = "Рефакторинг";
+                this.refactorButton.Text = "Форматирование кода";
                 this.refactorButton.UseVisualStyleBackColor = true;
                 this.refactorButton.Click += new System.EventHandler(this.RefactorButton_Click);
                 // 

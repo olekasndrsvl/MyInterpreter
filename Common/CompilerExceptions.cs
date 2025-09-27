@@ -18,7 +18,7 @@ public class Position
         return $"({Line}, {Column})";
     }
 }
-public class ComplierExceptions
+public class CompilerExceptions
 {
     public class BaseCompilerException : Exception
     {

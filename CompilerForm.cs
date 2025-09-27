@@ -2,7 +2,8 @@
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
-using static MyInterpreter.RefactorVisitor;
+using static MyInterpreter.FormatCodeVisitor;
+using System.Threading;
 namespace MyInterpreter
 {
     public partial class CompilerForm : Form
@@ -14,6 +15,7 @@ namespace MyInterpreter
             Instance = this;
         }
 
+      
         public void ChangeOutputBoxText(string text)
         {
          //   outputTextBox.Text = text;
@@ -75,12 +77,15 @@ namespace MyInterpreter
                  {
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
+                     var sv = new SemanticCheckVisitor();
+                     progr.VisitP(sv);
+                  
                      outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
                      
                  }
-                 catch (ComplierExceptions.BaseCompilerException ex)
+                 catch (CompilerExceptions.BaseCompilerException ex)
                  {
-                     outputTextBox.Text = ComplierExceptions.OutPutError(ex.GetType().ToString(), ex, lex.Lines);
+                     outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
                      //  MessageBox.Show();
                  }
                  
@@ -88,50 +93,58 @@ namespace MyInterpreter
              }
      
              // Кнопка запуска
-             private void RunButton_Click(object sender, EventArgs e)
+             private async void RunButton_Click(object sender, EventArgs e)
              {
-                 outputTextBox.Clear();
                  Lexer lex =new Lexer(codeTextBox.Text);
-             
-                 
+                 outputTextBox.Clear();
                  try
                  {
+                     
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
+                     var  sv = new SemanticCheckVisitor();
+                     progr.VisitP(sv);
+                     var rooti =progr.Visit(new ConvertASTToInterpretTreeVisitor()) as InterpreterTree.StatementNodeI;
                      outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
-                     progr.Execute();
-                     
-                     
+                     await RunProgramm(rooti);
+
                  }
-                 catch (ComplierExceptions.BaseCompilerException ex)
+                 catch (CompilerExceptions.BaseCompilerException ex)
                  {
-                     outputTextBox.Text = ComplierExceptions.OutPutError(ex.GetType().ToString(), ex, lex.Lines);
+                     outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
                      //  MessageBox.Show();
                  }
                  
              }
-     
+
+             private async Task RunProgramm(InterpreterTree.StatementNodeI r) => r.Execute();
+             
              // Кнопка рефакторинга
              private void RefactorButton_Click(object sender, EventArgs e)
              {
                  Lexer lex =new Lexer(codeTextBox.Text);
-             
-                 
+
+
                  try
                  {
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
-                     var pp = new RefactorVisitor();
+                     var pp = new FormatCodeVisitor();
                      codeTextBox.Text = progr.Visit(pp);
-                   //  Console.WriteLine(progr.Visit(pp));
-                     outputTextBox.Text = "Код отрефакторен!";
+                     //Console.WriteLine(progr.Visit(pp));
+                     outputTextBox.Text = "Код отформатирован!";
                  }
-                 catch (ComplierExceptions.BaseCompilerException ex)
+                 catch (CompilerExceptions.LexerException ex)
                  {
-                     outputTextBox.Text = ComplierExceptions.OutPutError(ex.GetType().ToString(), ex, lex.Lines);
+                     outputTextBox.Text = "Lex ERROR:" + CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+                 }
+                 catch (CompilerExceptions.BaseCompilerException ex)
+                 {
+                     outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
                      //  MessageBox.Show();
                  }
                  
              }
     }
 }
+// 

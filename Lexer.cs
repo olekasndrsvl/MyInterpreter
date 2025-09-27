@@ -13,75 +13,160 @@ public class TokenBase
         this.value = value;
     }
 }
-public class LexerBase
+
+
+
+public class TokenT<TokenType>
 {
-    public string code;// код программы. Инициализируется в конструкторе
-    public int line = 1;   // текущая строка
-    public int column = 0; // текущий столбец
-    public int cur = 0;    // текущая позиция
-    public int start = 0;  // начальная позиция токена. code[start:cur] - текущий токен
-    public bool atEoln = false; // сервисное поле для метода NextChar
+    public TokenType Typ { get; set; }
+    public int Pos { get; set; } 
+    public object Value { get; set; }
 
-    public Position CurrentPosition() => new Position(line,column);
-    public bool IsAtEnd() => cur >= code.Length;
-
-    /// Возвращает текущий символ и переходит к следующему
-    public char NextChar()
+    public TokenT(TokenType typ, int pos, object value = null)
     {
-        char result;
-        result = PeekChar(); // вернуть текущий символ 
-        if(atEoln)
-        {
-            atEoln = false;
-            line += 1;
-            column = 0; 
-        }
-
-        if (result == (char)0)
-            return result;
-        
-        if (result =='\n')
-        {
-            atEoln = true;
-        }
-        cur += 1; // перейти к следующему
-        column += 1;
-
-        return result;
+        Typ = typ;
+        Pos = pos;
+        Value = value;
     }
-
-    // Если текущий символ = expected, то продвигаемся вперед
-    public bool IsMatch(char expected)
-    {
-        bool result = PeekChar() == expected;
-        if (result)
-            NextChar();
-        return result;
-    }
-
-    /// Вернуть текущий символ
-    public char PeekChar() => IsAtEnd() ? (char)0 : code[cur];
-    
-    /// Вернуть следующий символ
-    public char PeekNextChar()
-    {
-        var pos = cur + 1;
-        return pos > code.Length ? (char)0 : code[pos];
-    }
-    
-    /// Является ли символ буквой
-    public static bool IsAlpha(char c) => Regex.IsMatch(c.ToString(), "[A-Za-zА-Яа-яёЁ_]");
-    
-    /// Является ли символ буквой или цифрой
-    public static bool IsAlphaNumeric(char c) => IsAlpha(c) || char.IsDigit(c);
-
-    public string[] Lines => code.Split((char)(10));
-    
-    public LexerBase(string code)
-    {
-        this.code = code;
-    }    
 }
+
+
+    public interface ILexer<TokenType>
+    {
+        string[] GetLines();
+        TokenT<TokenType> NextToken();
+        bool TokenTypeIsEof(TokenType tt);
+        int GetLineNumber();
+    }
+
+    public abstract class LexerBase<TokenType> : ILexer<TokenType>
+    {
+        protected string code;
+        protected int line = 1;
+        protected int column = 1;
+        protected int cur = 0;
+        protected int tokenStart = 0;
+        protected bool atEoln = false;
+
+        protected Position CurrentPosition() => new Position(line,column); // Simple position representation
+
+        protected bool IsAtEnd() => cur >= code.Length;
+
+        protected string GetTokenText() => code.Substring(tokenStart, cur - tokenStart);
+
+        protected void StartToken() => tokenStart = cur;
+
+        protected void SkipWhitespace()
+        {
+            while (IsWhitespace(PeekChar()) && !IsAtEnd())
+                NextChar();
+        }
+
+        protected char NextChar()
+        {
+            char result = PeekChar();
+            if (result == '\0')
+                return result;
+
+            if (result == '\n')
+            {
+                atEoln = false;
+                line += 1;
+                column = 1;
+            }
+            else
+            {
+                column += 1;
+            }
+
+            if (result == '\n')
+                atEoln = true;
+
+            cur += 1;
+            return result;
+        }
+
+        protected bool IsMatch(char expected)
+        {
+            if (PeekChar() != expected)
+                return false;
+
+            NextChar();
+            return true;
+        }
+
+        protected char PeekChar() => IsAtEnd() ? '\0' : code[cur];
+
+        protected char PeekNextChar() => (cur + 1) >= code.Length ? '\0' : code[cur + 1];
+
+        protected static bool IsAlpha(char c)
+        {
+            return Regex.IsMatch(c.ToString(), @"[A-Za-zА-Яа-яёЁ_]");
+        }
+
+        protected static bool IsAlphaNumeric(char c) => IsAlpha(c) || char.IsDigit(c);
+
+        protected static bool IsWhitespace(char c)
+        {
+            return c == '\r' || c == '\u0007' || c == ' ' || c == '\n' || c == '\t';
+        }
+
+        protected string ReadNumber()
+        {
+            StartToken();
+            while (char.IsDigit(PeekChar()))
+                NextChar();
+
+            if (PeekChar() == '.' && char.IsDigit(PeekNextChar()))
+            {
+                NextChar();
+                while (char.IsDigit(PeekChar()))
+                    NextChar();
+            }
+
+            return GetTokenText();
+        }
+
+        protected string ReadIdentifier()
+        {
+            StartToken();
+            if (IsAlpha(PeekChar()))
+            {
+                NextChar();
+                while (IsAlphaNumeric(PeekChar()))
+                    NextChar();
+            }
+            return GetTokenText();
+        }
+
+        protected string ReadString(char quoteChar = '"')
+        {
+            StartToken();
+            if (IsMatch(quoteChar))
+            {
+                while (PeekChar() != quoteChar && !IsAtEnd())
+                    NextChar();
+
+                if (!IsMatch(quoteChar))
+                    MyInterpreter.CompilerExceptions.LexerError("Незавершенная строковая константа", CurrentPosition());
+            }
+            return GetTokenText();
+        }
+
+        public string[] GetLines() => code.Split('\n');
+
+        public LexerBase(string code)
+        {
+            this.code = code;
+        }
+        public int GetLineNumber() => line;
+     
+        public abstract TokenT<TokenType> NextToken();
+        public abstract bool TokenTypeIsEof(TokenType tt);
+        
+        
+    }
+
 
 
 
@@ -95,8 +180,11 @@ public enum TokenType
     Equal, Less, LessEqual, Greater, GreaterEqual, NotEqual,
     tkAnd, tkOr, tkNot,
     Eof, 
-    tkTrue, tkFalse, tkIf, tkThen, tkElse, tkWhile, tkDo 
+    tkTrue, tkFalse, tkIf, tkThen, tkElse, tkWhile, tkDo, tkFor 
 }
+
+
+
 
 public class Token : TokenBase
 {
@@ -108,160 +196,160 @@ public class Token : TokenBase
 }
 
 
-public class Lexer: LexerBase
-{
-    Dictionary<string, TokenType> KeyWords = new Dictionary<string, TokenType>()
+public partial class Lexer : LexerBase<TokenType>
     {
-        {"True", TokenType.tkTrue},
-        {"False", TokenType.tkFalse},
-        {"if", TokenType.tkIf},
-        {"then", TokenType.tkThen},
-        {"else", TokenType.tkElse},
-        {"while", TokenType.tkWhile},
-        {"do", TokenType.tkDo}
-    };
+        private static readonly Dictionary<string, TokenType> Keywords = new Dictionary<string, TokenType>
+        {
+            ["True"] = TokenType.tkTrue,
+            ["False"] = TokenType.tkFalse,
+            ["if"] = TokenType.tkIf,
+            ["then"] = TokenType.tkThen,
+            ["else"] = TokenType.tkElse,
+            ["while"] = TokenType.tkWhile,
+            ["do"] = TokenType.tkDo,
+            ["for"] = TokenType.tkFor,
+        };
 
-    private Token GetIdentifier(Position startPos)
-    {
-        while (IsAlphaNumeric(PeekChar()))
-        { 
-            NextChar();
+        public Lexer(string code) : base(code) { }
+
+        public override bool TokenTypeIsEof(TokenType tt) => tt == TokenType.Eof;
+
+        private TokenT<TokenType> ScanIdentifier(int startPos)
+        {
+            var identifier = ReadIdentifier();
+            var tokenType = Keywords.TryGetValue(identifier, out var keywordType) 
+                ? keywordType 
+                : TokenType.Id;
+            return new TokenT<TokenType>(tokenType, startPos, identifier);
         }
 
-        var value = code[start..cur];
-        var type = TokenType.Id;
-        if (KeyWords.ContainsKey(value))
+        private TokenT<TokenType> ScanString(int startPos)
         {
-            type = KeyWords[value];
+            var strWithQuotes = ReadString('"');
+            var strValue = strWithQuotes.Substring(1, strWithQuotes.Length - 2);
+            return new TokenT<TokenType>(TokenType.StringLiteral, startPos, strValue);
         }
-        return new Token(type, startPos, value);
-    }
-
-    private Token GetString(Position startPos)
-    {
-        while(PeekChar() != '"' && !IsAtEnd())
-            NextChar();
-        NextChar();
-        var value = code[(start + 1)..(cur - 1)];
-        return new Token(TokenType.StringLiteral, startPos, value);
-    }
-    private Token GetNumber(Position startPos)
-    {
-        while (char.IsDigit(PeekChar()))
+         
+        private TokenT<TokenType> ScanNumber(int startPos)
         {
-            NextChar();
+            var numberStr = ReadNumber();
+            
+            if (numberStr.Contains("."))
+                return new TokenT<TokenType>(TokenType.DoubleLiteral, startPos, double.Parse(numberStr, CultureInfo.InvariantCulture));
+            else
+                return new TokenT<TokenType>(TokenType.Int, startPos, int.Parse(numberStr));
         }
 
-        if (PeekChar() == '.' && char.IsDigit(PeekNextChar()))
+        private TokenT<TokenType> ScanSymbol(int startPos)
         {
-            NextChar();
-            while (char.IsDigit(PeekChar()))
+            StartToken();
+            var c = NextChar();
+            
+            switch (c)
             {
-                NextChar();
-            }
-
-            var value = code[start..cur];
-            var re = double.Parse(value, CultureInfo.InvariantCulture);
-            return new Token(TokenType.DoubleLiteral, startPos, re);
-        }
-        var _value = code[start..cur];
-        return new Token(TokenType.Int, startPos, _value);
-    }
-
-
-    public Token NextToken()
-    {
-        var c = NextChar();
-        while (c == (char)13 || c == (char)7 || c == ' ' || c == (char)10) //пропуск пробелов/табов
-            c = NextChar();
-        var pos = CurrentPosition();
-        start = cur - 1;
-
-        switch (c)
-        {
-                case (char)0:
-                    return new Token(TokenType.Eof,pos,"Eof");
-                case ',': 
-                    return new Token(TokenType.Comma,pos,',');
-                case ')': 
-                    return new Token(TokenType.RPar,pos,')');
+                case ',':
+                    return new TokenT<TokenType>(TokenType.Comma, startPos, ",");
+                case ')':
+                    return new TokenT<TokenType>(TokenType.RPar, startPos, ")");
                 case '(':
-                    return new Token(TokenType.LPar,pos,'(');
+                    return new TokenT<TokenType>(TokenType.LPar, startPos, "(");
                 case '}':
-                    return new Token(TokenType.RBrace,pos,'}');
-                case '{': 
-                    return new Token(TokenType.LBrace,pos,'{');
-                case '+': 
-                    return new Token(IsMatch('=') ? TokenType.AssignPlus : TokenType.Plus,pos,code[start..cur]);
-                case '-': 
-                    return new Token(IsMatch('=') ? TokenType.AssignMinus : TokenType.Minus,pos,code[start..cur]);
+                    return new TokenT<TokenType>(TokenType.RBrace, startPos, "}");
+                case '{':
+                    return new TokenT<TokenType>(TokenType.LBrace, startPos, "{");
+                case ';':
+                    return new TokenT<TokenType>(TokenType.Semicolon, startPos, ";");
+                case '.':
+                    return new TokenT<TokenType>(TokenType.Dot, startPos, ".");
+                    
+                case '+':
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.AssignPlus : TokenType.Plus,
+                        startPos, GetTokenText());
+                        
+                case '-':
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.AssignMinus : TokenType.Minus,
+                        startPos, GetTokenText());
+                        
                 case '*':
-                    return new Token(IsMatch('=') ? TokenType.AssignMult : TokenType.Multiply,pos,code[start..cur]);
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.AssignMult : TokenType.Multiply,
+                        startPos, GetTokenText());
+                        
                 case '/':
                     if (IsMatch('/'))
                     {
-                        while (PeekChar() != (char)10 && !IsAtEnd())
+                        // Skip comment
+                        while (PeekChar() != '\n' && !IsAtEnd())
                             NextChar();
+                        return NextToken(); // Recursively get next token
                     }
                     else
                     {
-                        return new Token(IsMatch('=') ? TokenType.AssignDiv : TokenType.Divide, pos,code[start..cur]);
+                        return new TokenT<TokenType>(
+                            IsMatch('=') ? TokenType.AssignDiv : TokenType.Divide,
+                            startPos, GetTokenText());
                     }
-                    break;
-                case ';': 
-                    return new Token(TokenType.Semicolon,pos,';');
-                case '!': 
-                    return new Token(IsMatch('=') ? TokenType.NotEqual : TokenType.tkNot,pos,code[start..cur]);
+                    
+                case '!':
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.NotEqual : TokenType.tkNot,
+                        startPos, GetTokenText());
+                        
                 case '=':
-                    return new Token(IsMatch('=') ? TokenType.Equal : TokenType.Assign,pos,code[start..cur]);
-                case '>': 
-                    return new Token(IsMatch('=') ? TokenType.GreaterEqual : TokenType.Greater,pos,code[start..cur]);
-                case '<': 
-                    return new Token(IsMatch('=') ? TokenType.LessEqual : TokenType.Less,pos,code[start..cur]);            
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.Equal : TokenType.Assign,
+                        startPos, GetTokenText());
+                        
+                case '>':
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.GreaterEqual : TokenType.Greater,
+                        startPos, GetTokenText());
+                        
+                case '<':
+                    return new TokenT<TokenType>(
+                        IsMatch('=') ? TokenType.LessEqual : TokenType.Less,
+                        startPos, GetTokenText());
+                        
                 case '&':
                     if (IsMatch('&'))
-                    {
-                        return new Token(TokenType.tkAnd,pos,code[start..cur]);
-                    }
+                        return new TokenT<TokenType>(TokenType.tkAnd, startPos, "&&");
                     else
-                    {
-                        throw new ComplierExceptions.LexerException($"Неверный символ {PeekChar()} после &",
-                            CurrentPosition());
-                    }
+                        MyInterpreter.CompilerExceptions.LexerError("Ожидается &&", CurrentPosition());
+                    break;
+                    
                 case '|':
                     if (IsMatch('|'))
-                    {
-                        return new Token(TokenType.tkOr,pos,code[start..cur]);
-                    }
+                        return new TokenT<TokenType>(TokenType.tkOr, startPos, "||");
                     else
-                    {
-                        ComplierExceptions.LexerError($"Неверный символ {PeekChar()} после |",
-                            CurrentPosition()
-                        );
-                    }
+                        MyInterpreter.CompilerExceptions.LexerError("Ожидается ||", CurrentPosition());
                     break;
-                case '"':
-                    return GetString(pos);
+                    
                 default:
-                    if (char.IsDigit(c))
-                    {
-                        return GetNumber(pos);
-                    }
-                    else if (IsAlpha(c))
-                    {
-                        return GetIdentifier(pos);
-                    }
-                    else
-                    {
-                        ComplierExceptions.LexerError(
-                            $"Неизвестный символ {c} в позиции {pos.Line},{pos.Column}", pos);
-                    }
+                    MyInterpreter.CompilerExceptions.LexerError($"Неизвестный символ: {c}", new Position(line, startPos));
                     break;
+            }
+            
+            return null; // Will never be reached due to exceptions
         }
-        return new Token(TokenType.Eof,pos,"Eof");
-    }
 
-    public Lexer(string code):base(code)
-    {
+        public override TokenT<TokenType> NextToken()
+        {
+            SkipWhitespace();
+            var pos = CurrentPosition();
+            if (IsAtEnd())
+                return new TokenT<TokenType>(TokenType.Eof, pos.Column, "Eof");
+            
+            var c = PeekChar();
+
+            if (char.IsDigit(c))
+                return ScanNumber(pos.Column);
+            else if (IsAlpha(c))
+                return ScanIdentifier(pos.Column);
+            else if (c == '"')
+                return ScanString(pos.Column);
+            else
+                return ScanSymbol(pos.Column);
+        }
     }
-}
