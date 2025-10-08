@@ -4,6 +4,8 @@ using System.Text;
 using System.Windows.Forms;
 using static MyInterpreter.FormatCodeVisitor;
 using System.Threading;
+using SmallMachine;
+
 namespace MyInterpreter
 {
     public partial class CompilerForm : Form
@@ -104,9 +106,24 @@ namespace MyInterpreter
                      var progr = parser.MainProgram();
                      var  sv = new SemanticCheckVisitor();
                      progr.VisitP(sv);
-                     var rooti =progr.Visit(new ConvertASTToInterpretTreeVisitor()) as InterpreterTree.StatementNodeI;
+                     
+                     // var generator = new GenerateVirtualMachineVisitor();
+                     // List<ThreeAddr> machineCode = generator.VisitNode(progr);
+                     //
+                     // VirtualMachine.RunProgram(machineCode);
+                     
+                     var generator = new CodeGenerator();
+                     List<SmallMachine.ThreeAddr> generatedCode = progr.Visit(generator);
+                     generatedCode.Add(new SmallMachine.ThreeAddr(SmallMachine.Commands.stop));
+                     SmallVirtualMachine.RunProgram(generatedCode);
+
+                     SmallVirtualMachine.MemoryDump(5);
+                     
+                     //var rooti =progr.Visit(new ConvertASTToInterpretTreeVisitor()) as InterpreterTree.StatementNodeI;
+                     
+                     
                      outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
-                     await RunProgramm(rooti);
+                     //await RunProgramm(rooti);
 
                  }
                  catch (CompilerExceptions.BaseCompilerException ex)
