@@ -4,6 +4,7 @@ using System.Text;
 using System.Windows.Forms;
 using static MyInterpreter.FormatCodeVisitor;
 using System.Threading;
+using MyInterpreter.Common;
 using SmallMachine;
 
 namespace MyInterpreter
@@ -111,18 +112,24 @@ namespace MyInterpreter
                      // List<ThreeAddr> machineCode = generator.VisitNode(progr);
                      //
                      // VirtualMachine.RunProgram(machineCode);
+                     var gen = new ThreeAddressCodeVisitor();
+                     progr.VisitP(gen);
+                     gen.FinalizeCode();
+                     VirtualMachine.LoadProgram(gen.Code);
+                     VirtualMachine.Run();
                      
-                     var generator = new CodeGenerator();
-                     List<SmallMachine.ThreeAddr> generatedCode = progr.Visit(generator);
-                     generatedCode.Add(new SmallMachine.ThreeAddr(SmallMachine.Commands.stop));
-                     SmallVirtualMachine.RunProgram(generatedCode);
+                     //var generator = new CodeGenerator();
+                     //List<SmallMachine.ThreeAddr> generatedCode = progr.Visit(generator);
+                     //generatedCode.Add(new SmallMachine.ThreeAddr(SmallMachine.Commands.stop));
+                     //SmallVirtualMachine.RunProgram(generatedCode);
 
-                     SmallVirtualMachine.MemoryDump(5);
+                     //SmallVirtualMachine.MemoryDump(5);
                      
                      //var rooti =progr.Visit(new ConvertASTToInterpretTreeVisitor()) as InterpreterTree.StatementNodeI;
                      
                      
-                     outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
+                    // outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
+                     VirtualMachine.MemoryDump(1000);
                      //await RunProgramm(rooti);
 
                  }

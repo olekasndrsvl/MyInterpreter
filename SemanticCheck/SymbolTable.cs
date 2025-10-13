@@ -273,7 +273,7 @@
             InitStandardFunctionsTable();
         }
 
-        // Методы для отладки
+        // For debug
         public static void PrintSymbolTable()
         {
             Console.WriteLine("Symbol Table:");
