@@ -192,6 +192,11 @@
             throw new KeyNotFoundException($"Symbol '{name}' not found");
         }
 
+        public static void ResetSymbolTable()
+        {
+            SymTable.Clear();
+            VarValues.Clear();
+        }
         public static RuntimeValue GetValue(string name)
         {
             var symbol = Get(name);

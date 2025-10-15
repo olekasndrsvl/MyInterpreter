@@ -37,17 +37,84 @@ public class ThreeAddressCodeVisitor : IVisitorP
         int rightTemp = _tempCounter - 1;
         
         int resultTemp = NewTemp();
-        
-        switch (bin.Op)
+
+        var leftType = TypeChecker.CalcType(bin.Left);
+        var rightType = TypeChecker.CalcType(bin.Right);
+        var resultType = TypeChecker.CalcType(bin);
+
+        // Handle type conversion if needed
+        if (leftType == SemanticType.IntType && rightType == SemanticType.DoubleType)
         {
-            case TokenType.Plus:
-                _code.Add(ThreeAddr.CreateBinary(Commands.iadd, leftTemp, rightTemp, resultTemp));
-                break;
-            case TokenType.Less:
-                _code.Add(ThreeAddr.CreateBinary(Commands.ilt, leftTemp, rightTemp, resultTemp));
-                break;
-            // Добавьте другие операторы по необходимости
+            // Convert left int to double
+            int convertedTemp = NewTemp();
+            _code.Add(ThreeAddr.CreateConvert(Commands.citr, leftTemp, convertedTemp));
+            leftTemp = convertedTemp;
+            leftType = SemanticType.DoubleType;
         }
+        else if (leftType == SemanticType.DoubleType && rightType == SemanticType.IntType)
+        {
+            // Convert right int to double
+            int convertedTemp = NewTemp();
+            _code.Add(ThreeAddr.CreateConvert(Commands.citr, rightTemp, convertedTemp));
+            rightTemp = convertedTemp;
+            rightType = SemanticType.DoubleType;
+        }
+
+        if (leftType == SemanticType.IntType && rightType == SemanticType.IntType)
+        {
+            switch (bin.Op)
+            {
+                case TokenType.Plus:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.iadd, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.Less:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.ilt, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.Greater:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.igt, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.Equal:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.ieq, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.NotEqual:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.ineq, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.GreaterEqual:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.ic2ge, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.LessEqual:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.ic2le, leftTemp, rightTemp, resultTemp));
+                    break;
+            }
+        }
+        else if (leftType == SemanticType.DoubleType || rightType == SemanticType.DoubleType)
+        {
+            switch (bin.Op)
+            {
+                case TokenType.Plus:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.radd, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.Less:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rlt, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.Greater:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rgt, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.Equal:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.req, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.NotEqual:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rneq, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.GreaterEqual:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rc2ge, leftTemp, rightTemp, resultTemp));
+                    break;
+                case TokenType.LessEqual:
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rc2le, leftTemp, rightTemp, resultTemp));
+                    break;
+            }
+        }
+        // Add boolean type handling if needed
     }
 
     public void VisitStatementList(StatementListNode stl)
@@ -82,39 +149,85 @@ public class ThreeAddressCodeVisitor : IVisitorP
     {
         int tempIndex = NewTemp();
         int varAddress = GetVariableAddress(id.Name);
-        _code.Add(ThreeAddr.CreateAssign(Commands.iass, tempIndex, varAddress));
+        var varType = TypeChecker.CalcType(id);
+        
+        Commands command = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
+        _code.Add(ThreeAddr.CreateAssign(command, tempIndex, varAddress));
     }
 
     public void VisitAssign(AssignNode ass)
     {
         ass.Expr.VisitP(this);
+        var exprType = TypeChecker.CalcType(ass.Expr);
         int exprResultTemp = _tempCounter - 1;
-        
         int varAddress = GetVariableAddress(ass.Ident.Name);
-        _code.Add(ThreeAddr.CreateAssign(Commands.iass, varAddress, exprResultTemp));
+        
+        if (exprType == SemanticType.IntType)
+        {
+            _code.Add(ThreeAddr.CreateAssign(Commands.iass, varAddress, exprResultTemp));
+        }
+        else if (exprType == SemanticType.DoubleType)
+        {
+            _code.Add(ThreeAddr.CreateAssign(Commands.rass, varAddress, exprResultTemp));
+        }
+        // Add boolean type handling if needed
     }
 
     public void VisitAssignOp(AssignOpNode ass)
     {
         int varAddress = GetVariableAddress(ass.Ident.Name);
+        var varType = TypeChecker.CalcType(ass.Ident);
         
         int currentValueTemp = NewTemp();
-        _code.Add(ThreeAddr.CreateAssign(Commands.iass, currentValueTemp, varAddress));
+        Commands loadCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
+        _code.Add(ThreeAddr.CreateAssign(loadCommand, currentValueTemp, varAddress));
         
         ass.Expr.VisitP(this);
         int exprResultTemp = _tempCounter - 1;
+        var exprType = TypeChecker.CalcType(ass.Expr);
         
-        int operationResultTemp = NewTemp();
-        switch (ass.Op)
+        // Handle type conversion if needed
+        if (varType == SemanticType.DoubleType && exprType == SemanticType.IntType)
         {
-            case '+':
-                _code.Add(ThreeAddr.CreateBinary(Commands.iadd, currentValueTemp, exprResultTemp, operationResultTemp));
-                break;
+            int convertedTemp = NewTemp();
+            _code.Add(ThreeAddr.CreateConvert(Commands.citr, exprResultTemp, convertedTemp));
+            exprResultTemp = convertedTemp;
         }
         
-        _code.Add(ThreeAddr.CreateAssign(Commands.iass, varAddress, operationResultTemp));
+        int operationResultTemp = NewTemp();
+        
+        if (varType == SemanticType.DoubleType)
+        {
+            switch (ass.Op)
+            {
+                case '+':
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rassadd, currentValueTemp, exprResultTemp, operationResultTemp));
+                    break;
+                case '-':
+                    _code.Add(ThreeAddr.CreateBinary(Commands.rasssub, currentValueTemp, exprResultTemp, operationResultTemp));
+                    break;
+                // Add other operations as needed
+            }
+        }
+        else
+        {
+            switch (ass.Op)
+            {
+                case '+':
+                    _code.Add(ThreeAddr.CreateBinary(Commands.iadd, currentValueTemp, exprResultTemp, operationResultTemp));
+                    break;
+                case '-':
+                    _code.Add(ThreeAddr.CreateBinary(Commands.isub, currentValueTemp, exprResultTemp, operationResultTemp));
+                    break;
+                // Add other operations as needed
+            }
+        }
+        
+        Commands storeCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
+        _code.Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp));
     }
 
+ 
     public void VisitIf(IfNode ifn)
     {
         string elseLabel = NewLabel();

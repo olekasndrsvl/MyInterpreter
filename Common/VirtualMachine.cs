@@ -4,7 +4,7 @@ namespace MyInterpreter;
 
 public enum Commands 
 {
-    nop,        // No operation
+  
     
     //=
     iass,       // Integer assignment
@@ -53,6 +53,10 @@ public enum Commands
     req,        // Real equality
     beq,        // Boolean equality
     
+    // x!=y
+    ineq,   // Integer non equality
+    rneq,   // Real equality
+    bneq,   // Boolean equality
     //x>=y
     ic2ge,      // Integer compare to greater or equal
     rc2ge,      // Real compare to greater or equal
@@ -61,6 +65,8 @@ public enum Commands
     ic2le,      // Integer compare to less or equal
     rc2le,      //   Real compare to less or equal
     
+    // convert
+    citr,       // convert integer to real
     // if
     iif,        // Conditional jump
     
@@ -149,6 +155,12 @@ public class ThreeAddr
         return new ThreeAddr { command = comm, MemIndex = destIndex, Op1Index = srcIndex };
     }
     
+    // Для конвертации типов
+    public static ThreeAddr CreateConvert(Commands comm, int srcIndex, int destIndex)
+    {
+        return new ThreeAddr { command = comm, MemIndex = srcIndex, Op1Index = destIndex };
+    }
+    
     // Для бинарных операций (iadd, isub, etc)
     public static ThreeAddr CreateBinary(Commands comm, int op1Index, int op2Index, int resIndex)
     {
@@ -199,7 +211,7 @@ public class VirtualMachine
 
     public static void MemoryDump(int count = 10) 
     {
-        CompilerForm.Instance.ChangeOutputBoxText("Memory Dump:");
+        CompilerForm.Instance.ChangeOutputBoxText("Memory Dump:\n");
         for (int i = 0; i < Math.Min(count, Mem.Length); i++)
         {
             if (Mem[i].i != 0 || Mem[i].r != 0.0 || Mem[i].b)
@@ -244,6 +256,15 @@ public class VirtualMachine
         }
     }
 
+    public static void ResetVirtualMachine()
+    {
+        _programCounter = 0;
+        InitializeMemory();
+        _callStack.Clear();
+        _paramStack.Clear();
+        _labelAddresses.Clear();
+        _program = null;
+    }
     private static void ExecuteCommand(ThreeAddr cmd)
     {
         // Проверяем и расширяем память при необходимости
@@ -252,7 +273,7 @@ public class VirtualMachine
         {
             EnsureMemorySize(maxIndex + 1);
         }
-        
+        double TOLERANCE=0.00000001;
        // CompilerForm.Instance.ChangeOutputBoxText(cmd.command.ToString());
         //MemoryDump(1000);
         switch (cmd.command)
@@ -342,13 +363,24 @@ public class VirtualMachine
                 break;
                 
             case Commands.req: // Real equality
-                Mem[cmd.MemIndex].b = Mem[cmd.Op1Index].r == Mem[cmd.Op2Index].r;
+                Mem[cmd.MemIndex].b = Math.Abs(Mem[cmd.Op1Index].r - Mem[cmd.Op2Index].r) < TOLERANCE;
                 break;
                 
             case Commands.beq: // Boolean equality
                 Mem[cmd.MemIndex].b = Mem[cmd.Op1Index].b == Mem[cmd.Op2Index].b;
                 break;
+            
+            case Commands.ineq: // Integer equality
+                Mem[cmd.MemIndex].b = Mem[cmd.Op1Index].i != Mem[cmd.Op2Index].i;
+                break;
                 
+            case Commands.rneq: // Real equality
+                Mem[cmd.MemIndex].b = Math.Abs(Mem[cmd.Op1Index].r - Mem[cmd.Op2Index].r) >= TOLERANCE;
+                break;
+                
+            case Commands.bneq: // Boolean equality
+                Mem[cmd.MemIndex].b = Mem[cmd.Op1Index].b != Mem[cmd.Op2Index].b;
+                break;
             case Commands.ic2ge: // Integer compare to greater or equal
                 Mem[cmd.MemIndex].b = Mem[cmd.Op1Index].i >= cmd.IValue;
                 break;
@@ -413,7 +445,9 @@ public class VirtualMachine
                 Mem[cmd.MemIndex].r = Mem[cmd.Op1Index].r - Mem[cmd.Op2Index].r;
                 break;
     
-         
+            case Commands.citr: // Convert Integer to Real
+                Mem[cmd.Op1Index].r = Mem[cmd.MemIndex].i;
+                break;
     
             case Commands.call: // Function/procedure call
                 // Реализация вызова функции
@@ -457,10 +491,7 @@ public class VirtualMachine
                 
             case Commands.stop: // Stop execution
                 break;
-                
-            case Commands.nop: // No operation
-                break;
-                
+          
             default:
                 throw new NotImplementedException($"Command {cmd.command} not implemented");
         }

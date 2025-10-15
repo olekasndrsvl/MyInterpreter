@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
@@ -78,6 +79,7 @@ namespace MyInterpreter
                  outputTextBox.Clear();
                  try
                  {
+                     SymbolTable.ResetSymbolTable();
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
                      var sv = new SemanticCheckVisitor();
@@ -105,6 +107,7 @@ namespace MyInterpreter
                      
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
+                     SymbolTable.ResetSymbolTable();
                      var  sv = new SemanticCheckVisitor();
                      progr.VisitP(sv);
                      
@@ -116,8 +119,12 @@ namespace MyInterpreter
                      progr.VisitP(gen);
                      gen.FinalizeCode();
                      VirtualMachine.LoadProgram(gen.Code);
-                     VirtualMachine.Run();
                      
+                     var sw = new Stopwatch();
+                     sw.Start();
+                     VirtualMachine.Run();
+                     sw.Stop();
+                     CompilerForm.Instance.ChangeOutputBoxText($"Programm elapsed time: {sw.Elapsed}\n"); // Здесь логируем
                      //var generator = new CodeGenerator();
                      //List<SmallMachine.ThreeAddr> generatedCode = progr.Visit(generator);
                      //generatedCode.Add(new SmallMachine.ThreeAddr(SmallMachine.Commands.stop));
@@ -131,7 +138,7 @@ namespace MyInterpreter
                     // outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
                      VirtualMachine.MemoryDump(1000);
                      //await RunProgramm(rooti);
-
+                     VirtualMachine.ResetVirtualMachine();
                  }
                  catch (CompilerExceptions.BaseCompilerException ex)
                  {
