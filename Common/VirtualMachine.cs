@@ -79,6 +79,8 @@ public enum Commands
     call,       // Function/procedure call
     param,      // Parameter passing
     
+    push,
+    pop,
     
     
     label,      // Label marker
@@ -184,7 +186,10 @@ public class VirtualMachine
     private static Dictionary<string, int> _labelAddresses = new Dictionary<string, int>();
     private static ThreeAddr[] _program;
     private static int _programCounter = 0;
-
+    private static Dictionary<string, Action> _standardFunctions = new Dictionary<string, Action>
+    {
+        { "print", () => ExecutePrintFunction() }
+    };
     public static void InitializeMemory()
     {
         for (int i = 0; i < Mem.Length; i++)
@@ -450,31 +455,41 @@ public class VirtualMachine
                 break;
     
             case Commands.call: // Function/procedure call
-                // Реализация вызова функции
-                if (_labelAddresses.TryGetValue(cmd.Label, out int callAddress))
+                if (_standardFunctions.ContainsKey(cmd.Label))
                 {
-                    // Сохраняем текущую позицию для возврата
+                    // Вызов стандартной функции
+                    _standardFunctions[cmd.Label]();
+                    
+                    // Если это вызов функции (не процедуры), сохраняем результат
+                    if (cmd.MemIndex != 0)
+                    {
+                        // Для стандартных функций можно вернуть какое-то значение
+                        // Например, для print возвращаем 0
+                        Mem[cmd.MemIndex].i = 0;
+                    }
+                }
+                else if (_labelAddresses.TryGetValue(cmd.Label, out int callAddress))
+                {
+                    // Обычный вызов пользовательской функции
                     _callStack.Push(_programCounter);
-                    _programCounter = callAddress - 1; // -1 потому что после выполнения команды будет инкремент
+                    _programCounter = callAddress - 1;
                 }
                 else
                 {
-                    throw new Exception($"Function label '{cmd.Label}' not found");
+                    throw new Exception($"Function or procedure '{cmd.Label}' not found");
                 }
                 break;
     
-            case Commands.param: // Parameter passing
-                // Реализация передачи параметра в функцию
-                if (_paramStack.Count > 0)
-                {
-                    var paramValue = _paramStack.Pop();
-                    Mem[cmd.MemIndex] = paramValue;
-                }
-                else
-                {
-                    throw new Exception("No parameters available on parameter stack");
-                }
+          
+            case Commands.push: // Push parameter onto stack
+                _paramStack.Push(Mem[cmd.MemIndex]);
                 break;
+                
+            case Commands.pop: // Pop from stack
+                if (_paramStack.Count > 0)
+                    _paramStack.Pop();
+                break;
+            
             case Commands.go: // Unconditional jump
                 if (_labelAddresses.TryGetValue(cmd.Label, out int jumpAddress))
                 {
@@ -497,6 +512,25 @@ public class VirtualMachine
         }
     }
 
+    private static void ExecutePrintFunction()
+    {
+        if (_paramStack.Count > 0)
+        {
+            var value = _paramStack.Peek(); // Смотрим значение, но не убираем со стека
+            
+            // Определяем тип и выводим соответствующее значение
+            // Можно добавить логику определения типа на основе содержимого
+            if (Math.Abs(value.r) > 0.000001)
+            {
+                CompilerForm.Instance.ChangeOutputBoxText(value.r.ToString("F6"));
+            }
+            else
+            {
+                CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString());
+            }
+            
+        }
+    }
     public static void RunProgram(List<ThreeAddr> program)
     {
         InitializeMemory();

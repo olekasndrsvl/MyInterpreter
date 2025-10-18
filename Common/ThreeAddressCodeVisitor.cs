@@ -310,29 +310,45 @@ public class ThreeAddressCodeVisitor : IVisitorP
         _code.Add(ThreeAddr.Create(Commands.label, endLabel));
     }
 
+   
     public void VisitProcCall(ProcCallNode p)
     {
+        // Сначала вычисляем все параметры и пушим их на стек
         foreach (var param in p.Pars.lst)
         {
             param.VisitP(this);
             int paramTemp = _tempCounter - 1;
-            _code.Add(ThreeAddr.Create(Commands.param, paramTemp));
+            _code.Add(ThreeAddr.Create(Commands.push, paramTemp));
         }
-        
+    
+        // Затем вызываем функцию
         _code.Add(ThreeAddr.Create(Commands.call, 0, p.Name.Name));
+    
+        // Очищаем стек после вызова (убираем параметры)
+        for (int i = 0; i < p.Pars.lst.Count; i++)
+        {
+            _code.Add(ThreeAddr.Create(Commands.pop));
+        }
     }
-
     public void VisitFuncCall(FuncCallNode f)
     {
+        // Сначала вычисляем все параметры и пушим их на стек
         foreach (var param in f.Pars.lst)
         {
             param.VisitP(this);
             int paramTemp = _tempCounter - 1;
-            _code.Add(ThreeAddr.Create(Commands.param, paramTemp));
+            _code.Add(ThreeAddr.Create(Commands.push, paramTemp));
         }
-        
+    
+        // Затем вызываем функцию и сохраняем результат
         int resultTemp = NewTemp();
         _code.Add(ThreeAddr.Create(Commands.call, resultTemp, f.Name.Name));
+    
+        // Очищаем стек после вызова (убираем параметры)
+        for (int i = 0; i < f.Pars.lst.Count; i++)
+        {
+            _code.Add(ThreeAddr.Create(Commands.pop));
+        }
     }
 
     public void FinalizeCode()
