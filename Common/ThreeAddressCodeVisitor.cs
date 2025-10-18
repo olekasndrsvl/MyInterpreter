@@ -9,6 +9,72 @@ public class ThreeAddressCodeVisitor : IVisitorP
     private Dictionary<string, int> _variableAddresses = new Dictionary<string, int>();
     private int _nextVarAddress = 0;
     
+    // Таблица для бинарных операций: (тип_левого, тип_правого, токен) -> команда
+    private static readonly Dictionary<(SemanticType, SemanticType, TokenType), Commands> _binOpTable = 
+        new Dictionary<(SemanticType, SemanticType, TokenType), Commands>
+    {
+        // Целочисленные операции
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Plus), Commands.iadd},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Minus), Commands.isub},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Multiply), Commands.imul},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Divide), Commands.idiv},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Less), Commands.ilt},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Greater), Commands.igt},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.Equal), Commands.ieq},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.NotEqual), Commands.ineq},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.LessEqual), Commands.ic2le},
+        {(SemanticType.IntType, SemanticType.IntType, TokenType.GreaterEqual), Commands.ic2ge},
+        
+        // Вещественные операции
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Plus), Commands.radd},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Minus), Commands.rsub},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Multiply), Commands.rmul},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Divide), Commands.rdiv},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Less), Commands.rlt},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Greater), Commands.rgt},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.Equal), Commands.req},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.NotEqual), Commands.rneq},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.LessEqual), Commands.rc2le},
+        {(SemanticType.DoubleType, SemanticType.DoubleType, TokenType.GreaterEqual), Commands.rc2ge},
+        
+        // Смешанные типы (int-double) - преобразуются к double
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Plus), Commands.radd},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Plus), Commands.radd},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Minus), Commands.rsub},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Minus), Commands.rsub},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Multiply), Commands.rmul},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Multiply), Commands.rmul},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Divide), Commands.rdiv},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Divide), Commands.rdiv},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Less), Commands.rlt},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Less), Commands.rlt},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Greater), Commands.rgt},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Greater), Commands.rgt},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.Equal), Commands.req},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.Equal), Commands.req},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.NotEqual), Commands.rneq},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.NotEqual), Commands.rneq},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.LessEqual), Commands.rc2le},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.LessEqual), Commands.rc2le},
+        {(SemanticType.IntType, SemanticType.DoubleType, TokenType.GreaterEqual), Commands.rc2ge},
+        {(SemanticType.DoubleType, SemanticType.IntType, TokenType.GreaterEqual), Commands.rc2ge},
+    };
+
+    // Таблица для операций присваивания с операцией: (тип_переменной, символ_операции) -> команда
+    private static readonly Dictionary<(SemanticType, char), Commands> _assignOpTable =
+        new Dictionary<(SemanticType, char), Commands>
+    {
+        {(SemanticType.IntType, '+'), Commands.iadd},
+        {(SemanticType.IntType, '-'), Commands.isub},
+        {(SemanticType.IntType, '*'), Commands.imul},
+        {(SemanticType.IntType, '/'), Commands.idiv},
+        
+        {(SemanticType.DoubleType, '+'), Commands.radd},
+        {(SemanticType.DoubleType, '-'), Commands.rsub},
+        {(SemanticType.DoubleType, '*'), Commands.rmul},
+        {(SemanticType.DoubleType, '/'), Commands.rdiv},
+    };
+
     public List<ThreeAddr> Code => _code;
     public Dictionary<string, int> LabelAddresses => _labelAddresses;
 
@@ -36,13 +102,12 @@ public class ThreeAddressCodeVisitor : IVisitorP
         bin.Right.VisitP(this);
         int rightTemp = _tempCounter - 1;
         
-        int resultTemp = NewTemp();
+        
 
         var leftType = TypeChecker.CalcType(bin.Left);
         var rightType = TypeChecker.CalcType(bin.Right);
-        var resultType = TypeChecker.CalcType(bin);
 
-        // Handle type conversion if needed
+        // Автоматическое преобразование типов при необходимости
         if (leftType == SemanticType.IntType && rightType == SemanticType.DoubleType)
         {
             // Convert left int to double
@@ -59,62 +124,18 @@ public class ThreeAddressCodeVisitor : IVisitorP
             rightTemp = convertedTemp;
             rightType = SemanticType.DoubleType;
         }
-
-        if (leftType == SemanticType.IntType && rightType == SemanticType.IntType)
+        
+        int resultTemp = NewTemp();
+        // Поиск команды в таблице
+        if (_binOpTable.TryGetValue((leftType, rightType, bin.Op), out Commands command))
         {
-            switch (bin.Op)
-            {
-                case TokenType.Plus:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.iadd, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.Less:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.ilt, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.Greater:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.igt, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.Equal:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.ieq, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.NotEqual:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.ineq, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.GreaterEqual:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.ic2ge, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.LessEqual:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.ic2le, leftTemp, rightTemp, resultTemp));
-                    break;
-            }
+            _code.Add(ThreeAddr.CreateBinary(command, leftTemp, rightTemp, resultTemp));
         }
-        else if (leftType == SemanticType.DoubleType || rightType == SemanticType.DoubleType)
+        else
         {
-            switch (bin.Op)
-            {
-                case TokenType.Plus:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.radd, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.Less:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rlt, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.Greater:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rgt, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.Equal:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.req, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.NotEqual:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rneq, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.GreaterEqual:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rc2ge, leftTemp, rightTemp, resultTemp));
-                    break;
-                case TokenType.LessEqual:
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rc2le, leftTemp, rightTemp, resultTemp));
-                    break;
-            }
+            throw new InvalidOperationException(
+                $"Unsupported binary operation {bin.Op} for types {leftType} and {rightType}");
         }
-        // Add boolean type handling if needed
     }
 
     public void VisitStatementList(StatementListNode stl)
@@ -157,20 +178,43 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
     public void VisitAssign(AssignNode ass)
     {
-        ass.Expr.VisitP(this);
-        var exprType = TypeChecker.CalcType(ass.Expr);
-        int exprResultTemp = _tempCounter - 1;
         int varAddress = GetVariableAddress(ass.Ident.Name);
-        
-        if (exprType == SemanticType.IntType)
+        var varType = TypeChecker.CalcType(ass.Ident);
+    
+        // Оптимизация для констант
+        if (ass.Expr is IntNode intNode)
         {
-            _code.Add(ThreeAddr.CreateAssign(Commands.iass, varAddress, exprResultTemp));
+            if (varType == SemanticType.DoubleType)
+            {
+                // int -> double: создаем double константу напрямую
+                _code.Add(ThreeAddr.CreateConst(Commands.rcass, varAddress, (double)intNode.Val));
+            }
+            else
+            {
+                _code.Add(ThreeAddr.CreateConst(Commands.icass, varAddress, intNode.Val));
+            }
         }
-        else if (exprType == SemanticType.DoubleType)
+        else if (ass.Expr is DoubleNode doubleNode)
         {
-            _code.Add(ThreeAddr.CreateAssign(Commands.rass, varAddress, exprResultTemp));
+            if (varType == SemanticType.IntType)
+            {
+                // double -> int: преобразуем с потерей точности
+                _code.Add(ThreeAddr.CreateConst(Commands.icass, varAddress, (int)doubleNode.Val));
+            }
+            else
+            {
+                _code.Add(ThreeAddr.CreateConst(Commands.rcass, varAddress, doubleNode.Val));
+            }
         }
-        // Add boolean type handling if needed
+        else
+        {
+            ass.Expr.VisitP(this);
+            var exprType = TypeChecker.CalcType(ass.Expr);
+            int exprResultTemp = _tempCounter - 1;
+            varAddress = GetVariableAddress(ass.Ident.Name);
+            Commands command = exprType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
+            _code.Add(ThreeAddr.CreateAssign(command, varAddress, exprResultTemp));
+        }
     }
 
     public void VisitAssignOp(AssignOpNode ass)
@@ -196,38 +240,21 @@ public class ThreeAddressCodeVisitor : IVisitorP
         
         int operationResultTemp = NewTemp();
         
-        if (varType == SemanticType.DoubleType)
+        // Использование таблицы для операций присваивания
+        if (_assignOpTable.TryGetValue((varType, ass.Op), out Commands operationCommand))
         {
-            switch (ass.Op)
-            {
-                case '+':
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rassadd, currentValueTemp, exprResultTemp, operationResultTemp));
-                    break;
-                case '-':
-                    _code.Add(ThreeAddr.CreateBinary(Commands.rasssub, currentValueTemp, exprResultTemp, operationResultTemp));
-                    break;
-                // Add other operations as needed
-            }
+            _code.Add(ThreeAddr.CreateBinary(operationCommand, currentValueTemp, exprResultTemp, operationResultTemp));
         }
         else
         {
-            switch (ass.Op)
-            {
-                case '+':
-                    _code.Add(ThreeAddr.CreateBinary(Commands.iadd, currentValueTemp, exprResultTemp, operationResultTemp));
-                    break;
-                case '-':
-                    _code.Add(ThreeAddr.CreateBinary(Commands.isub, currentValueTemp, exprResultTemp, operationResultTemp));
-                    break;
-                // Add other operations as needed
-            }
+            throw new InvalidOperationException(
+                $"Unsupported assignment operation '{ass.Op}' for type {varType}");
         }
         
         Commands storeCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
         _code.Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp));
     }
 
- 
     public void VisitIf(IfNode ifn)
     {
         string elseLabel = NewLabel();
