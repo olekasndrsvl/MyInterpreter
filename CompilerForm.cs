@@ -6,7 +6,7 @@ using System.Windows.Forms;
 using static MyInterpreter.FormatCodeVisitor;
 using System.Threading;
 using MyInterpreter.Common;
-using SmallMachine;
+
 
 namespace MyInterpreter
 {
@@ -75,7 +75,7 @@ namespace MyInterpreter
              private void CompileButton_Click(object sender, EventArgs e)
              {
                  Lexer lex =new Lexer(codeTextBox.Text);
-             
+                 SymbolTable.ResetSymbolTable();
                  outputTextBox.Clear();
                  try
                  {
@@ -148,14 +148,14 @@ namespace MyInterpreter
                  
              }
 
-             private async Task RunProgramm(InterpreterTree.StatementNodeI r) => r.Execute();
+            
              
              // Кнопка рефакторинга
              private void RefactorButton_Click(object sender, EventArgs e)
              {
                  Lexer lex =new Lexer(codeTextBox.Text);
-
-
+                 SymbolTable.ResetSymbolTable();
+               
                  try
                  {
                      Parser parser = new Parser(lex);

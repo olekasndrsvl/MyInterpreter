@@ -69,4 +69,19 @@ public class StrangeLanguageVisitor : IVisitor<string>
 
     public string VisitFuncCall(FuncCallNode f) =>
         f.Name.Name + "(" + VisitNode(f.Pars) + ")";
+
+    public string VisitFuncDef(FuncDefNode f)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string VisitFuncDefList(FuncDefListNode lst)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string VisitReturn(ReturnNode r)
+    {
+        throw new NotImplementedException();
+    }
 }

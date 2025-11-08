@@ -180,7 +180,8 @@ public enum TokenType
     Equal, Less, LessEqual, Greater, GreaterEqual, NotEqual,
     tkAnd, tkOr, tkNot,
     Eof, 
-    tkTrue, tkFalse, tkIf, tkThen, tkElse, tkWhile, tkDo, tkFor 
+    tkTrue, tkFalse, tkIf, tkThen, tkElse, tkWhile, tkDo, tkFor,
+    tkDef,  tkReturn,
 }
 
 
@@ -208,6 +209,8 @@ public partial class Lexer : LexerBase<TokenType>
             ["while"] = TokenType.tkWhile,
             ["do"] = TokenType.tkDo,
             ["for"] = TokenType.tkFor,
+            ["def"] = TokenType.tkDef,
+            ["return"] = TokenType.tkReturn,
         };
 
         public Lexer(string code) : base(code) { }

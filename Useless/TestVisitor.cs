@@ -361,7 +361,17 @@ public class TestVisitor
         
         return code;
     }
-    
+
+    public List<ThreeAddr> VisitFunDef(FuncDefNode f)
+    {
+        throw new NotImplementedException();
+    }
+
+    public List<ThreeAddr> VisitReturn(ReturnNode r)
+    {
+        throw new NotImplementedException();
+    }
+
     public Dictionary<string, int> GetVariableMap()
     {
         return new Dictionary<string, int>(_variableAddresses);

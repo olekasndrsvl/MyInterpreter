@@ -107,6 +107,91 @@
         public override string ToString() => $"{Name} ({Kind}, {Type})";
     }
 
+    // Класс для хранения специализации функции
+    public class FunctionSpecialization
+    {
+        public SemanticType[] ParameterTypes { get; set; }
+        public SemanticType ReturnType { get; set; }
+        public Dictionary<string, SemanticType> LocalVariableTypes { get; } = new Dictionary<string, SemanticType>();
+        public int SpecializationId { get; set; }
+
+        public FunctionSpecialization()
+        {
+        }
+        public FunctionSpecialization(SemanticType[] parameterTypes, SemanticType returnType = SemanticType.AnyType)
+        {
+            ParameterTypes = parameterTypes;
+            ReturnType = returnType;
+        }
+        
+        public override bool Equals(object obj)
+        {
+            if (obj is FunctionSpecialization other)
+            {
+                if (ParameterTypes.Length != other.ParameterTypes.Length)
+                    return false;
+                    
+                for (int i = 0; i < ParameterTypes.Length; i++)
+                {
+                    if (ParameterTypes[i] != other.ParameterTypes[i])
+                        return false;
+                }
+                return ReturnType == other.ReturnType;
+            }
+            return false;
+        }
+        
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                foreach (var type in ParameterTypes)
+                {
+                    hash = hash * 31 + type.GetHashCode();
+                }
+                hash = hash * 31 + ReturnType.GetHashCode();
+                return hash;
+            }
+        }
+    }
+
+    // Информация о функции
+    public class FunctionInfo
+    {
+        public FuncDefNode Definition { get; set; }
+        public List<FunctionSpecialization> Specializations { get; } = new List<FunctionSpecialization>();
+        
+        public FunctionSpecialization FindOrCreateSpecialization(SemanticType[] parameterTypes)
+        {
+            foreach (var spec in Specializations)
+            {
+                if (AreParameterTypesCompatible(spec.ParameterTypes, parameterTypes))
+                {
+                    return spec;
+                }
+            }
+            
+            var newSpec = new FunctionSpecialization(parameterTypes);
+            Specializations.Add(newSpec);
+            newSpec.SpecializationId = Specializations.Count - 1;
+            return newSpec;
+        }
+        
+        private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
+        {
+            if (paramTypes.Length != argTypes.Length)
+                return false;
+
+            for (int i = 0; i < paramTypes.Length; i++)
+            {
+                if (!SymbolTable.AreTypesCompatible(paramTypes[i], argTypes[i]))
+                    return false;
+            }
+            return true;
+        }
+    }
+
     // Статические массивы типов
     public static class Constants
     {
@@ -134,6 +219,7 @@
             TokenType.tkOr, 
             TokenType.tkNot
         };
+        
         public static SemanticType[] NumTypes = { SemanticType.IntType, SemanticType.DoubleType };
     }
 
@@ -142,6 +228,9 @@
     {
         public static Dictionary<string, SymbolInfo> SymTable = new Dictionary<string, SymbolInfo>();
         public static List<RuntimeValue> VarValues = new List<RuntimeValue>();
+        
+        // Новая структура для хранения информации о функциях
+        public static Dictionary<string, FunctionInfo> FunctionTable = new Dictionary<string, FunctionInfo>();
 
         // Таблица стандартных функций
         private static void InitStandardFunctionsTable()
@@ -164,6 +253,14 @@
 
             SymTable["Round"] = new SymbolInfo("Round", KindType.FuncName,
                 new SemanticType[] { SemanticType.DoubleType }, SemanticType.IntType, -1);
+            
+            // Инициализируем FunctionTable для стандартных функций
+            FunctionTable["Sqrt"] = new FunctionInfo();
+            FunctionTable["Print"] = new FunctionInfo();
+            FunctionTable["Sin"] = new FunctionInfo();
+            FunctionTable["Cos"] = new FunctionInfo();
+            FunctionTable["Abs"] = new FunctionInfo();
+            FunctionTable["Round"] = new FunctionInfo();
         }
 
         // Методы для работы с таблицей символов
@@ -181,6 +278,42 @@
         public static void AddFunction(string name, SemanticType[] paramTypes, SemanticType returnType)
         {
             SymTable[name] = new SymbolInfo(name, KindType.FuncName, paramTypes, returnType, -1);
+            
+            // Также добавляем в FunctionTable если еще нет
+            if (!FunctionTable.ContainsKey(name))
+            {
+                FunctionTable[name] = new FunctionInfo();
+            }
+        }
+        
+        // Новый метод для регистрации определения функции
+        public static void RegisterFunctionDefinition(string name, FuncDefNode definition)
+        {
+            if (!FunctionTable.ContainsKey(name))
+            {
+                FunctionTable[name] = new FunctionInfo();
+            }
+            FunctionTable[name].Definition = definition;
+        }
+        
+        // Новый метод для получения специализации функции
+        public static FunctionSpecialization GetFunctionSpecialization(string name, SemanticType[] argTypes)
+        {
+            if (FunctionTable.ContainsKey(name))
+            {
+                return FunctionTable[name].FindOrCreateSpecialization(argTypes);
+            }
+            return null;
+        }
+        
+        // Новый метод для получения всех специализаций функции
+        public static List<FunctionSpecialization> GetFunctionSpecializations(string name)
+        {
+            if (FunctionTable.ContainsKey(name))
+            {
+                return FunctionTable[name].Specializations;
+            }
+            return new List<FunctionSpecialization>();
         }
 
         public static bool Contains(string name) => SymTable.ContainsKey(name);
@@ -196,7 +329,9 @@
         {
             SymTable.Clear();
             VarValues.Clear();
+            FunctionTable.Clear();
         }
+        
         public static RuntimeValue GetValue(string name)
         {
             var symbol = Get(name);
@@ -236,6 +371,7 @@
                 SemanticType.IntType => RuntimeValueHelper.Value(0),
                 SemanticType.DoubleType => RuntimeValueHelper.Value(0.0),
                 SemanticType.BoolType => RuntimeValueHelper.Value(false),
+                SemanticType.AnyType => RuntimeValueHelper.Value(0),
                 _ => throw new ArgumentException($"Unsupported type: {type}")
             };
         }
@@ -285,6 +421,31 @@
             foreach (var symbol in SymTable.Values)
             {
                 Console.WriteLine($"  {symbol.Name}: {symbol.Kind}, {symbol.Type}, Index: {symbol.Index}");
+            }
+        }
+
+        public static void PrintFunctionTable()
+        {
+            Console.WriteLine("Function Table:");
+            foreach (var function in FunctionTable)
+            {
+                Console.WriteLine($"  {function.Key}:");
+                if (function.Value.Definition != null)
+                {
+                    Console.WriteLine($"    Definition: Present");
+                }
+                Console.WriteLine($"    Specializations: {function.Value.Specializations.Count}");
+                foreach (var spec in function.Value.Specializations)
+                {
+                    Console.WriteLine($"      Specialization {spec.SpecializationId}:");
+                    Console.WriteLine($"        Parameters: [{string.Join(", ", spec.ParameterTypes)}]");
+                    Console.WriteLine($"        Return Type: {spec.ReturnType}");
+                    Console.WriteLine($"        Local Variables: {spec.LocalVariableTypes.Count}");
+                    foreach (var localVar in spec.LocalVariableTypes)
+                    {
+                        Console.WriteLine($"          {localVar.Key}: {localVar.Value}");
+                    }
+                }
             }
         }
 

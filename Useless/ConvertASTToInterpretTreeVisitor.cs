@@ -180,6 +180,15 @@ public class ConvertASTToInterpretTreeVisitor : IVisitor<InterpreterTree.NodeI>
     }
 
     public InterpreterTree.NodeI VisitFuncCall(FuncCallNode f) => null;
+    public NodeI VisitFunDef(FuncDefNode f)
+    {
+        throw new NotImplementedException();
+    }
+
+    public NodeI VisitReturn(ReturnNode r)
+    {
+        throw new NotImplementedException();
+    }
 
     public InterpreterTree.NodeI VisitBinOp(BinOpNode bin)
     {

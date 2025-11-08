@@ -1,4 +1,6 @@
-﻿namespace MyInterpreter.Common;
+﻿using System.Security;
+
+namespace MyInterpreter.Common;
 
 public class ThreeAddressCodeVisitor : IVisitorP
 {
@@ -349,6 +351,30 @@ public class ThreeAddressCodeVisitor : IVisitorP
         {
             _code.Add(ThreeAddr.Create(Commands.pop));
         }
+    }
+
+    public void VisitFuncDef(FuncDefNode f)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void VisitFuncDefList(FuncDefListNode lst)
+    {
+        foreach (var VARIABLE in lst.lst) 
+        {
+            VARIABLE.VisitP(this);
+        }
+    }
+
+    public void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
+    {
+        fdandStmts.FuncDefList.VisitP(this);
+        fdandStmts.StatementList.VisitP(this);
+    }
+
+    public void VisitReturn(ReturnNode r)
+    {
+        throw new NotImplementedException();
     }
 
     public void FinalizeCode()

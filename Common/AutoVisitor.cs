@@ -70,4 +70,35 @@ public class AutoVisitor : IVisitorP
     {
         f.Pars.VisitP(this);
     }
+
+    public virtual void VisitFuncDef(FuncDefNode f)
+    {
+        f.Name.VisitP(this);
+        foreach (var VARIABLE in f.Params)
+        {
+            VARIABLE.VisitP(this);
+        }
+        f.Body.VisitP(this);
+        
+    }
+
+    public void VisitFuncDefList(FuncDefListNode lst)
+    {
+        foreach (var VARIABLE in lst.lst)
+        {
+            VARIABLE.VisitP(this);
+        }
+    }
+
+    public void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
+    {
+       fdandStmts.FuncDefList.VisitP(this);
+       fdandStmts.StatementList.VisitP(this);
+    }
+
+    public virtual void VisitReturn(ReturnNode r)
+    {
+        if (r.Expr != null)
+            r.Expr.VisitP(this);
+    }
 }

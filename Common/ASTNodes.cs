@@ -18,6 +18,10 @@ public interface IVisitor<T>
     T VisitFor(ForNode forNode);
     T VisitProcCall(ProcCallNode p);
     T VisitFuncCall(FuncCallNode f);
+    T VisitFuncDef(FuncDefNode f);
+    T VisitFuncDefList(FuncDefListNode lst);
+    T VisitReturn(ReturnNode r);
+    T VisitFunDefAndStatements(FuncDefAndStatements fdandStmts);
 }
 
 public interface IVisitorP
@@ -38,6 +42,10 @@ public interface IVisitorP
     void VisitFor(ForNode forNode);
     void VisitProcCall(ProcCallNode p);
     void VisitFuncCall(FuncCallNode f);
+    void VisitFuncDef(FuncDefNode f);
+    void VisitFuncDefList(FuncDefListNode lst);
+    void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts);
+    void VisitReturn(ReturnNode r);
 }
 
 public class Node
@@ -110,6 +118,16 @@ public class StatementListNode : StatementNode
     
     public override T Visit<T>(IVisitor<T> v) => v.VisitStatementList(this);
     public override void VisitP(IVisitorP v) => v.VisitStatementList(this);
+}
+
+public class FuncDefListNode : FuncDefNode
+{
+    public List<FuncDefNode> lst = new List<FuncDefNode>();
+    public void Add(FuncDefNode f) => lst.Add(f);
+    public override string ToString() => string.Join(";", lst);
+    public override T Visit<T>(IVisitor<T> v) => v.VisitFuncDefList(this);
+    public override void VisitP(IVisitorP v) => v.VisitFuncDefList(this);
+   
 }
 
 public class ExprListNode : Node
@@ -299,11 +317,66 @@ public class ProcCallNode : StatementNode
     public override void VisitP(IVisitorP v) => v.VisitProcCall(this);
 }
 
+public class FuncDefAndStatements : Node
+{
+    public StatementNode StatementList { get; set; }
+    public FuncDefNode FuncDefList { get; set; }
+
+    public FuncDefAndStatements(FuncDefNode funcDefList,StatementNode statementList,  Position p = null)
+    {
+        this.StatementList = statementList;
+        this.FuncDefList = funcDefList;
+        Pos = p;
+    }
+    public override T Visit<T>(IVisitor<T> v) => v.VisitFunDefAndStatements(this);
+    public override void VisitP(IVisitorP v) => v.VisitFunDefAndStatements(this);
+}
+
+public class FuncDefNode :Node
+{
+    public IdNode Name { get; set; }
+    public List<IdNode> Params { get; set; }
+    public StatementNode Body { get; set; }
+    public SemanticType ReturnType { get; set; }
+
+    public FuncDefNode()
+    {
+     
+    }
+    public FuncDefNode(IdNode Name, List<IdNode> Params, StatementNode Body, Position p = null)
+    {
+        this.Name = Name;
+        this.Params = Params;
+        this.Body = Body;
+        Pos = p;
+    }
+        
+    public override string ToString() => $"def {Name}({string.Join(",", Params)}) {Body}";
+    public override T Visit<T>(IVisitor<T> v) => v.VisitFuncDef(this);
+    public override void VisitP(IVisitorP v) => v.VisitFuncDef(this);
+}
+public class ReturnNode : StatementNode
+{
+    public ExprNode Expr { get; set; }
+    
+    public ReturnNode(ExprNode expr, Position p = null)
+    {
+        Expr = expr;
+        Pos = p;
+    }
+    
+    public override string ToString() => $"return {Expr}";
+    
+    public override T Visit<T>(IVisitor<T> v) => v.VisitReturn(this);
+    public override void VisitP(IVisitorP v) => v.VisitReturn(this);
+}
+
 public class FuncCallNode : ExprNode
 {
     public IdNode Name { get; set; }
     public ExprListNode Pars { get; set; }
-    
+    public SemanticType ValueType;
+    public int SpecializationId { get; set; } = -1; // -1 означает отсутствие специализации
     public FuncCallNode(IdNode Name, ExprListNode Pars, Position p = null)
     {
         this.Name = Name;
