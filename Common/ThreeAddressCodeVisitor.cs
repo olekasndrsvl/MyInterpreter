@@ -320,7 +320,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         {
             param.VisitP(this);
             int paramTemp = _tempCounter - 1;
-            _code.Add(ThreeAddr.Create(Commands.push, paramTemp));
+               //.. _code.Add(ThreeAddr.Create(Commands.push, paramTemp));
         }
     
         // Затем вызываем функцию
@@ -329,7 +329,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         // Очищаем стек после вызова (убираем параметры)
         for (int i = 0; i < p.Pars.lst.Count; i++)
         {
-            _code.Add(ThreeAddr.Create(Commands.pop));
+            //_code.Add(ThreeAddr.Create(Commands.pop));
         }
     }
     public void VisitFuncCall(FuncCallNode f)
@@ -339,7 +339,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         {
             param.VisitP(this);
             int paramTemp = _tempCounter - 1;
-            _code.Add(ThreeAddr.Create(Commands.push, paramTemp));
+          //  _code.Add(ThreeAddr.Create(Commands.push, paramTemp));
         }
     
         // Затем вызываем функцию и сохраняем результат
@@ -349,7 +349,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         // Очищаем стек после вызова (убираем параметры)
         for (int i = 0; i < f.Pars.lst.Count; i++)
         {
-            _code.Add(ThreeAddr.Create(Commands.pop));
+           // _code.Add(ThreeAddr.Create(Commands.pop));
         }
     }
 

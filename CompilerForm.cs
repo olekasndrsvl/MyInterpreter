@@ -118,6 +118,7 @@ namespace MyInterpreter
                      var gen = new ThreeAddressCodeVisitor();
                      progr.VisitP(gen);
                      gen.FinalizeCode();
+                     VirtualMachine.GiveFrameSize(new Dictionary<string, int>(){{"MainFrame",200}});
                      VirtualMachine.LoadProgram(gen.Code);
                      
                      var sw = new Stopwatch();

@@ -41,6 +41,10 @@ public class CompilerExceptions
         public SemanticException(string message, Position p = null) : base(message, p) { }
     }
 
+    public class UnExpectedException : BaseCompilerException
+    {
+        public UnExpectedException(string message, Position p = null) : base(message, p) { }
+    }
     
     // Выброс ошибок объявленных выше
     public static void LexerError(string msg, Position pos)
