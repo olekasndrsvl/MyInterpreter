@@ -111,16 +111,19 @@ namespace MyInterpreter
                      var  sv = new SemanticCheckVisitor();
                      progr.VisitP(sv);
                      
+                     
+                     SymbolTable.PrintFunctionTable();
                      // var generator = new GenerateVirtualMachineVisitor();
                      // List<ThreeAddr> machineCode = generator.VisitNode(progr);
                      //
                      // VirtualMachine.RunProgram(machineCode);
                      var gen = new ThreeAddressCodeVisitor();
                      progr.VisitP(gen);
-                     gen.FinalizeCode();
-                     VirtualMachine.GiveFrameSize(new Dictionary<string, int>(){{"MainFrame",200}});
-                     VirtualMachine.LoadProgram(gen.Code);
-                     
+                     VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
+                     var code = gen.GetCode();
+                     VirtualMachine.LoadProgram(code);
+                     VirtualMachine.MemoryDump(1000);
+                    
                      var sw = new Stopwatch();
                      sw.Start();
                      VirtualMachine.Run();

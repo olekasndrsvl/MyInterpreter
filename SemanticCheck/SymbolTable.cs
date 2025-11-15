@@ -84,24 +84,23 @@
         public KindType Kind { get; }
         public SemanticType Type { get; } // для функций - тип возвращаемого значения
         public SemanticType[] Params { get; } // для функций - типы параметров
-        public int Index { get; } // индекс переменной в таблице VarValues
-        public RuntimeValue Value { get; set; } // для интерпретатора
+       
 
-        public SymbolInfo(string n, KindType k, SemanticType t, int ind)
+        public SymbolInfo(string n, KindType k, SemanticType t)
         {
             Name = n;
             Kind = k;
             Type = t;
-            Index = ind;
+           
         }
 
-        public SymbolInfo(string n, KindType k, SemanticType[] pars, SemanticType t, int ind)
+        public SymbolInfo(string n, KindType k, SemanticType[] pars, SemanticType t)
         {
             Name = n;
             Kind = k;
             Params = pars;
             Type = t;
-            Index = ind;
+            
         }
 
         public override string ToString() => $"{Name} ({Kind}, {Type})";
@@ -114,7 +113,7 @@
         public SemanticType ReturnType { get; set; }
         public Dictionary<string, SemanticType> LocalVariableTypes { get; } = new Dictionary<string, SemanticType>();
         public int SpecializationId { get; set; }
-
+        public bool BodyChecked { get; set; }
         public FunctionSpecialization()
         {
         }
@@ -160,7 +159,7 @@
     public class FunctionInfo
     {
         public FuncDefNode Definition { get; set; }
-        public List<FunctionSpecialization> Specializations { get; } = new List<FunctionSpecialization>();
+        public List<FunctionSpecialization> Specializations { get; set; } = new List<FunctionSpecialization>();
         
         public FunctionSpecialization FindOrCreateSpecialization(SemanticType[] parameterTypes)
         {
@@ -236,23 +235,23 @@
         private static void InitStandardFunctionsTable()
         {
             SymTable["Sqrt"] = new SymbolInfo("Sqrt", KindType.FuncName,
-                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType, -1);
+                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType);
 
             SymTable["Print"] = new SymbolInfo("Print", KindType.FuncName,
-                new SemanticType[] { SemanticType.AnyType }, SemanticType.NoType, -1);
+                new SemanticType[] { SemanticType.AnyType }, SemanticType.NoType);
 
             // Добавим другие стандартные функции
             SymTable["Sin"] = new SymbolInfo("Sin", KindType.FuncName,
-                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType, -1);
+                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType);
 
             SymTable["Cos"] = new SymbolInfo("Cos", KindType.FuncName,
-                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType, -1);
+                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType);
 
             SymTable["Abs"] = new SymbolInfo("Abs", KindType.FuncName,
-                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType, -1);
+                new SemanticType[] { SemanticType.DoubleType }, SemanticType.DoubleType);
 
             SymTable["Round"] = new SymbolInfo("Round", KindType.FuncName,
-                new SemanticType[] { SemanticType.DoubleType }, SemanticType.IntType, -1);
+                new SemanticType[] { SemanticType.DoubleType }, SemanticType.IntType);
             
             // Инициализируем FunctionTable для стандартных функций
             FunctionTable["Sqrt"] = new FunctionInfo();
@@ -264,20 +263,21 @@
         }
 
         // Методы для работы с таблицей символов
-        public static int AddVariable(string name, SemanticType type)
+        public static void AddVariable(string name, SemanticType type)
         {
+            PrintSymbolTable();
             if (SymTable.ContainsKey(name))
                 throw new InvalidOperationException($"Variable '{name}' already declared");
 
-            int index = VarValues.Count;
+         
             VarValues.Add(CreateDefaultValue(type));
-            SymTable[name] = new SymbolInfo(name, KindType.VarName, type, index);
-            return index;
+            SymTable[name] = new SymbolInfo(name, KindType.VarName, type);
+         
         }
 
         public static void AddFunction(string name, SemanticType[] paramTypes, SemanticType returnType)
         {
-            SymTable[name] = new SymbolInfo(name, KindType.FuncName, paramTypes, returnType, -1);
+            SymTable[name] = new SymbolInfo(name, KindType.FuncName, paramTypes, returnType);
             
             // Также добавляем в FunctionTable если еще нет
             if (!FunctionTable.ContainsKey(name))
@@ -332,20 +332,14 @@
             FunctionTable.Clear();
         }
         
-        public static RuntimeValue GetValue(string name)
-        {
-            var symbol = Get(name);
-            if (symbol.Kind != KindType.VarName)
-                throw new InvalidOperationException($"'{name}' is not a variable");
-            return VarValues[symbol.Index];
-        }
+     
 
         public static void SetValue(string name, RuntimeValue value)
         {
             var symbol = Get(name);
             if (symbol.Kind != KindType.VarName)
                 throw new InvalidOperationException($"'{name}' is not a variable");
-            VarValues[symbol.Index] = value;
+            //VarValues[symbol.Index] = value;
         }
 
         public static void SetIntValue(string name, int value)
@@ -420,7 +414,7 @@
             Console.WriteLine("Symbol Table:");
             foreach (var symbol in SymTable.Values)
             {
-                Console.WriteLine($"  {symbol.Name}: {symbol.Kind}, {symbol.Type}, Index: {symbol.Index}");
+                Console.WriteLine($"  {symbol.Name}: {symbol.Kind}, {symbol.Type}, ");
             }
         }
 

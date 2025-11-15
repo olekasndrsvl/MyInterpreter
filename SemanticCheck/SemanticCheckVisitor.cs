@@ -6,51 +6,26 @@ public class SemanticCheckVisitor : AutoVisitor
 {
     // Храним информацию о текущей проверяемой функции для рекурсивных вызовов
     private string _currentFunction = null;
-    private Dictionary<string, List<FunctionSpecialization>> _functionSpecializations = new();
-    private Dictionary<string, FuncDefNode> _functionDefinitions = new();
-
-    private class FunctionSpecialization
-    {
-        public SemanticType[] ParameterTypes { get; }
-        public SemanticType ReturnType { get; set; }
-        public bool BodyChecked { get; set; }
-
-        public FunctionSpecialization(SemanticType[] parameterTypes, SemanticType returnType = SemanticType.AnyType)
-        {
-            ParameterTypes = parameterTypes;
-            ReturnType = returnType;
-            BodyChecked = false;
-        }
-    }
-
+    //private Dictionary<string, List<FunctionSpecialization>> _functionSpecializations = new();
+   // private Dictionary<string, FuncDefNode> _functionDefinitions = new();
+    private Stack<FunctionSpecialization> _currentCheckingFunctionSpecialization = new Stack<FunctionSpecialization>();
+   
     public override void VisitAssign(AssignNode ass)
     {
         ass.Expr.VisitP(this);
         
-        if (!SymTable.ContainsKey(ass.Ident.Name))
+         // Вычислить тип
+        var typ = CalcTypeVis(ass.Expr);
+        ass.Ident.ValueType = typ;
+            
+        // Добавить в таблицу символов
+        if (_currentCheckingFunctionSpecialization.Count > 0 && !_currentCheckingFunctionSpecialization.Peek().LocalVariableTypes.ContainsKey(ass.Ident.Name) )
         {
-            // Вычислить тип
-            var typ = CalcTypeVis(ass.Expr);
-            
-            // Добавить переменную в таблицу переменных с нулевым значением
-            switch (typ)
-            {
-                case SemanticType.IntType:
-                    VarValues.Add(new RuntimeValue(0));
-                    break;
-                case SemanticType.DoubleType:
-                    VarValues.Add(new RuntimeValue(0.0));
-                    break;
-                case SemanticType.BoolType:
-                    VarValues.Add(new RuntimeValue(false));
-                    break;
-            }
-            
-            ass.Ident.ind = VarValues.Count - 1;
-            ass.Ident.ValueType = typ;
-            
-            // Добавить в таблицу символов
-            SymTable[ass.Ident.Name] = new SymbolInfo(ass.Ident.Name, KindType.VarName, typ, ass.Ident.ind);
+            _currentCheckingFunctionSpecialization.Peek().LocalVariableTypes.Add(ass.Ident.Name,typ);
+        }
+        else if(!SymTable.ContainsKey(ass.Ident.Name))
+        {
+            SymTable[ass.Ident.Name] = new SymbolInfo(ass.Ident.Name, KindType.VarName, typ );
         }
         else
         {
@@ -59,15 +34,10 @@ public class SemanticCheckVisitor : AutoVisitor
                 CompilerExceptions.SemanticError($"Имени стандартной функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
             
             // Вычислить тип
-            var typ = CalcTypeVis(ass.Expr);
             var idtyp = SymTable[ass.Ident.Name].Type;
             
             if (!AssignComparable(idtyp, typ))
                 CompilerExceptions.SemanticError($"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
-            
-            // Найти индекс существующей переменной
-            var ind = SymTable[ass.Ident.Name].Index;
-            ass.Ident.ind = ind;
             ass.Ident.ValueType = typ;
         }
     }
@@ -98,8 +68,8 @@ public class SemanticCheckVisitor : AutoVisitor
             if (!AssignComparable(idtyp, typ))
                 CompilerExceptions.SemanticError($"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
             
-            var ind = SymTable[ass.Ident.Name].Index;
-            ass.Ident.ind = ind;
+            
+         
             ass.Ident.ValueType = typ;
         }
     }
@@ -135,7 +105,7 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         
         var symbol = SymTable[id.Name];
-        id.ind = symbol.Index;
+     
         id.ValueType = symbol.Type;
     }
     
@@ -149,24 +119,29 @@ public class SemanticCheckVisitor : AutoVisitor
         }
 
         // Сохраняем определение функции
-        _functionDefinitions[node.Name.Name] = node;
+        FunctionTable[node.Name.Name] = new FunctionInfo();
+        FunctionTable[node.Name.Name].Definition = node;
 
         // Добавляем функцию с типами AnyType - конкретные типы будут выведены при вызовах
         var paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
         SymbolTable.AddFunction(node.Name.Name, paramTypes, SemanticType.AnyType);
 
         // Инициализируем специализации для этой функции
-        _functionSpecializations[node.Name.Name] = new List<FunctionSpecialization>();
+        if (FunctionTable.ContainsKey(node.Name.Name))
+        {
+            FunctionTable[node.Name.Name].Specializations =new List<FunctionSpecialization>();
+        }
     }
 
     public override void VisitFuncCall(FuncCallNode f)
     {
-        if (!SymbolTable.SymTable.ContainsKey(f.Name.Name))
+       
+        if (!FunctionTable.ContainsKey(f.Name.Name)&&!SymbolTable.SymTable.ContainsKey(f.Name.Name))
         {
             CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
             return;
         }
-        
+        var funcInfo = FunctionTable[f.Name.Name];
         var sym = SymbolTable.SymTable[f.Name.Name];
         if (sym.Kind != KindType.FuncName)
         {
@@ -213,8 +188,9 @@ public class SemanticCheckVisitor : AutoVisitor
         // Если тело функции еще не проверено для этой специализации, проверяем его
         if (!specialization.BodyChecked)
         {
-            CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
             specialization.BodyChecked = true;
+            CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
+          
         }
         
         // Устанавливаем тип возвращаемого значения для вызова функции
@@ -223,13 +199,13 @@ public class SemanticCheckVisitor : AutoVisitor
 
     private FunctionSpecialization FindOrCreateSpecialization(string functionName, SemanticType[] argTypes)
     {
-        if (!_functionSpecializations.ContainsKey(functionName))
+        if (! FunctionTable.ContainsKey(functionName))
         {
-            _functionSpecializations[functionName] = new List<FunctionSpecialization>();
+            FunctionTable[functionName].Specializations = new List<FunctionSpecialization>();
         }
 
         // Ищем существующую специализацию с подходящими типами параметров
-        foreach (var spec in _functionSpecializations[functionName])
+        foreach (var spec in  FunctionTable[functionName].Specializations)
         {
             if (AreParameterTypesCompatible(spec.ParameterTypes, argTypes))
             {
@@ -239,7 +215,7 @@ public class SemanticCheckVisitor : AutoVisitor
 
         // Создаем новую специализацию
         var newSpecialization = new FunctionSpecialization(argTypes);
-        _functionSpecializations[functionName].Add(newSpecialization);
+        FunctionTable[functionName].Specializations.Add(newSpecialization);
         return newSpecialization;
     }
 
@@ -250,7 +226,7 @@ public class SemanticCheckVisitor : AutoVisitor
 
         for (int i = 0; i < paramTypes.Length; i++)
         {
-            if (!AssignComparable(paramTypes[i], argTypes[i]))
+            if ( paramTypes[i] != argTypes[i])
                 return false;
         }
 
@@ -259,7 +235,7 @@ public class SemanticCheckVisitor : AutoVisitor
 
     private void CheckFunctionBodyWithSpecialization(string functionName, FunctionSpecialization specialization)
     {
-        if (!_functionDefinitions.TryGetValue(functionName, out var functionDef))
+        if (!FunctionTable.TryGetValue(functionName, out var functionDef))
         {
             CompilerExceptions.SemanticError($"Не найдено определение функции '{functionName}'", new Position(0, 0));
             return;
@@ -278,17 +254,19 @@ public class SemanticCheckVisitor : AutoVisitor
             try
             {
                 // Добавляем параметры в таблицу символов с конкретными типами из специализации
-                for (int i = 0; i < functionDef.Params.Count; i++)
+                for (int i = 0; i < functionDef.Definition.Params.Count; i++)
                 {
-                    var param = functionDef.Params[i];
+                    var param = functionDef.Definition.Params[i];
                     var paramType = specialization.ParameterTypes[i];
                     SymbolTable.AddVariable(param.Name, paramType);
-                    param.ind = SymbolTable.SymTable[param.Name].Index;
+                    specialization.LocalVariableTypes.Add(param.Name, paramType);
                 }
 
                 // Обходим тело функции и собираем типы всех return statements
+                _currentCheckingFunctionSpecialization.Push(specialization);
+                functionDef.Definition.Body.VisitP(this);
                 var returnTypes = new List<SemanticType>();
-                CollectReturnTypes(functionDef.Body, returnTypes);
+                CollectReturnTypes(functionDef.Definition.Body, returnTypes);
 
                 // Выводим тип возвращаемого значения
                 if (returnTypes.Count > 0)
@@ -321,6 +299,8 @@ public class SemanticCheckVisitor : AutoVisitor
                 {
                     SymbolTable.SymTable[kvp.Key] = kvp.Value;
                 }
+                if(_currentCheckingFunctionSpecialization.Count>0)
+                    _currentCheckingFunctionSpecialization.Pop();
             }
         }
         finally

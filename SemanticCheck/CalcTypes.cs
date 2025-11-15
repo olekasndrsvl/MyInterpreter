@@ -272,7 +272,7 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
             throw new InvalidOperationException($"Function '{functionName}' not found");
 
         var oldSymbol = SymbolTable.SymTable[functionName];
-        SymbolTable.SymTable[functionName] = new SymbolInfo(functionName, KindType.FuncName, newParamTypes, newReturnType, -1);
+        SymbolTable.SymTable[functionName] = new SymbolInfo(functionName, KindType.FuncName, newParamTypes, newReturnType);
     }
 
     public SemanticType VisitFuncDef(FuncDefNode f)
@@ -296,7 +296,7 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
                 // Для параметров используем AnyType - тип будет выведен при вызове
                 SymbolTable.AddVariable(param.Name, SemanticType.AnyType);
                 paramTypes.Add(SemanticType.AnyType);
-                param.ind = SymbolTable.SymTable[param.Name].Index;
+               
             }
 
             // Устанавливаем тип возвращаемого значения как AnyType

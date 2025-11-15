@@ -4,80 +4,15 @@ namespace MyInterpreter;
 
 public enum Commands 
 {
-    //=
-    iass,       // Integer assignment
-    rass,       // Real assignment  
-    bass,       // Boolean assignment
-    
-    // = const
-    icass,      // Integer constant assignment
-    rcass,      // Real constant assignment
-    bcass,      // Boolean constant assignment
-    
-    //+=
-    iassadd,    // Integer assignment with addition
-    rassadd,    // Real assignment with addition
-    
-    //-=
-    iasssub,    // Integer assignment with subtraction
-    rasssub,    // Real assignment with subtraction
-    
-    // x+y
-    iadd,       // Integer addition
-    radd,       // Real addition
-    
-    // x-y
-    isub,       // Integer subtraction
-    rsub,       // Real subtraction
-    
-    //x*y
-    imul,       // Integer multiplication
-    rmul,       // Real multiplication
-    
-    // x/y
-    idiv,       // Integer division
-    rdiv,       // Real division
-    
-    // x<y
-    ilt,        // Integer less than
-    rlt,        // Real less than
-    
-    //x>y
-    igt,        // Integer greater than
-    rgt,        // Real greater than
-    
-    //x==y
-    ieq,        // Integer equality
-    req,        // Real equality
-    beq,        // Boolean equality
-    
-    // x!=y
-    ineq,   // Integer non equality
-    rneq,   // Real equality
-    bneq,   // Boolean equality
-    //x>=y
-    ic2ge,      // Integer compare to greater or equal
-    rc2ge,      // Real compare to greater or equal
-    
-    // x<=y
-    ic2le,      // Integer compare to less or equal
-    rc2le,      //   Real compare to less or equal
-    
-    // convert
-    citr,       // convert integer to real
-    // if
-    iif,        // Conditional jump
-    
-    // if not
-    ifn,
-    // JMP
-    go,         // Unconditional jump
-    
-    call,       // Function/procedure call
-    creturn,
-    
-    label,      // Label marker
-    stop        // Stop execution
+   // Прямая адресация (все операнды прямые)
+    iass, rass, bass,
+    icass, rcass, bcass,
+    iadd, radd, isub, rsub, imul, rmul, idiv, rdiv,
+    ilt, rlt, igt, rgt, ieq, req, beq, ineq, rneq, bneq,
+    ic2ge, rc2ge, ic2le, rc2le,
+    iassadd, rassadd, iasssub, rasssub,
+    citr, iif, ifn, go, call, push, pop, creturn, label, stop,
+    movout, movin
 }
 
 public struct Value 
@@ -175,9 +110,15 @@ public class VirtualMachine
 {
     public static Value[] Mem = new Value[1000];
     public static Dictionary<string,int> FrameSizes = new Dictionary<string,int>();
-    public static int _currentFrameSize = 0;
-    private static int _currentFrameIndex = 0;
-    private static Stack<int> _callStack = new Stack<int>();
+    // Регистры виртуальной машины
+    private static int _currentFrameIndex = 0;    // SP - указатель вершины стека
+  
+    private static Value _returnValueRegister;  
+   
+    private static Stack<Tuple<int,int>> _currentFrameStack = new Stack<Tuple<int,int>>();
+    
+    // Стек вызовов - храним только адреса возврата
+    private static Stack<int> _returnAddressStack = new Stack<int>();
     
     private static Dictionary<string, int> _labelAddresses = new Dictionary<string, int>();
     private static ThreeAddr[] _program;
@@ -193,8 +134,7 @@ public class VirtualMachine
     {
         if (isIndirect)
         {
-            // Косвенная адресация: используем значение из памяти как новый индекс
-            return Mem[index].i;
+            return index + _currentFrameIndex;
         }
         return index;
     }
@@ -239,7 +179,8 @@ public class VirtualMachine
     public static void GiveFrameSize(Dictionary<string, int> dict)
     {
         FrameSizes = dict;
-        _currentFrameSize = FrameSizes["MainFrame"];
+        _currentFrameStack.Push(new Tuple<int, int>(0,FrameSizes["MainFrame"]));
+        FrameSizes["print"] = 1;
     }
     
     public static void InitializeMemory()
@@ -321,7 +262,7 @@ public class VirtualMachine
     private static void ExecuteCommand(ThreeAddr cmd)
     {
         double TOLERANCE = 0.00000001;
-
+        Console.WriteLine(_currentFrameIndex);
         switch (cmd.command)
         {
             case Commands.icass when cmd.IValue != 0:
@@ -552,7 +493,10 @@ public class VirtualMachine
                 break;
     
             case Commands.call:
-                _currentFrameIndex += FrameSizes[cmd.Label];
+               
+                _currentFrameIndex += _currentFrameStack.Peek().Item2;
+                _currentFrameStack.Push(new Tuple<int, int>(_currentFrameIndex, FrameSizes[cmd.Label]));
+               
                 
                 if (_standardFunctions.ContainsKey(cmd.Label))
                 {
@@ -560,7 +504,7 @@ public class VirtualMachine
                 }
                 else if (_labelAddresses.TryGetValue(cmd.Label, out int callAddress))
                 {
-                    _callStack.Push(_programCounter);
+                    _returnAddressStack.Push(_programCounter);
                     _programCounter = callAddress - 1;
                 }
                 else
@@ -570,9 +514,41 @@ public class VirtualMachine
                 break;
             
             case Commands.creturn:
-                int returnAddress = _callStack.Pop();
-                _programCounter = returnAddress - 1;
-                _currentFrameIndex -= _currentFrameSize;
+                int returnAddress = _returnAddressStack.Pop();
+                _programCounter = returnAddress;
+                _currentFrameStack.Pop();
+                _currentFrameIndex= _currentFrameStack.Peek().Item1;
+              
+                break;
+            case Commands.movout:
+                var tmp = new Value
+                {
+                    b = _returnValueRegister.b,
+                    i = _returnValueRegister.i,
+                    r = _returnValueRegister.r
+                };
+                
+                if (cmd.isInDirectAddressing1)
+                {
+                   
+                    Mem[cmd.MemIndex + _currentFrameIndex] = tmp;
+                }
+                else
+                {
+                    Mem[cmd.MemIndex] = tmp;
+                }
+                break;
+            
+            case Commands.movin:
+                if (cmd.isInDirectAddressing1)
+                {
+                   _returnValueRegister= Mem[cmd.MemIndex + _currentFrameIndex];
+                  
+                }
+                else
+                { 
+                    _returnValueRegister = Mem[cmd.MemIndex];
+                }
                 break;
             
             case Commands.go:
@@ -586,12 +562,13 @@ public class VirtualMachine
                 }
                 break;
                 
+         
             case Commands.label:
                 break;
                 
             case Commands.stop:
                 break;
-          
+            
             default:
                 throw new NotImplementedException($"Command {cmd.command} not implemented");
         }
@@ -599,6 +576,7 @@ public class VirtualMachine
 
     private static void ExecutePrintFunction()
     {
+        Console.WriteLine("print:"+_currentFrameIndex);
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex]; 
@@ -610,6 +588,7 @@ public class VirtualMachine
             {
                 CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString());
             }
+            _currentFrameIndex= _currentFrameStack.Pop().Item1;
         }
         else
         {
