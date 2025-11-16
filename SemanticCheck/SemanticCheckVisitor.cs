@@ -98,14 +98,19 @@ public class SemanticCheckVisitor : AutoVisitor
     
     public override void VisitId(IdNode id)
     {
-        if (!SymTable.ContainsKey(id.Name))
+        if (!SymTable.ContainsKey(id.Name) && _currentCheckingFunctionSpecialization.Count==0)
         {
             CompilerExceptions.SemanticError($"Идентификатор {id.Name} не определен", id.Pos);
             return;
         }
+
+        if (_currentCheckingFunctionSpecialization.Count > 0)
+        {
+            id.ValueType = _currentCheckingFunctionSpecialization.Peek().LocalVariableTypes[id.Name];
+            return;
+        }
         
         var symbol = SymTable[id.Name];
-     
         id.ValueType = symbol.Type;
     }
     
@@ -171,7 +176,8 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         
         // Ищем подходящую специализацию функции
-        FunctionSpecialization specialization = FindOrCreateSpecialization(f.Name.Name, argTypes.ToArray());
+        FunctionSpecialization specialization = FunctionTable[f.Name.Name].FindOrCreateSpecialization(argTypes.ToArray());
+        //FunctionSpecialization specialization = FindOrCreateSpecialization(f.Name.Name, argTypes.ToArray());
         
         // Проверяем совместимость типов аргументов
         for (int i = 0; i < specialization.ParameterTypes.Length; i++)
@@ -195,42 +201,7 @@ public class SemanticCheckVisitor : AutoVisitor
         
         // Устанавливаем тип возвращаемого значения для вызова функции
         f.ValueType = specialization.ReturnType;
-    }
-
-    private FunctionSpecialization FindOrCreateSpecialization(string functionName, SemanticType[] argTypes)
-    {
-        if (! FunctionTable.ContainsKey(functionName))
-        {
-            FunctionTable[functionName].Specializations = new List<FunctionSpecialization>();
-        }
-
-        // Ищем существующую специализацию с подходящими типами параметров
-        foreach (var spec in  FunctionTable[functionName].Specializations)
-        {
-            if (AreParameterTypesCompatible(spec.ParameterTypes, argTypes))
-            {
-                return spec;
-            }
-        }
-
-        // Создаем новую специализацию
-        var newSpecialization = new FunctionSpecialization(argTypes);
-        FunctionTable[functionName].Specializations.Add(newSpecialization);
-        return newSpecialization;
-    }
-
-    private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
-    {
-        if (paramTypes.Length != argTypes.Length)
-            return false;
-
-        for (int i = 0; i < paramTypes.Length; i++)
-        {
-            if ( paramTypes[i] != argTypes[i])
-                return false;
-        }
-
-        return true;
+        f.SpecializationId = specialization.SpecializationId;
     }
 
     private void CheckFunctionBodyWithSpecialization(string functionName, FunctionSpecialization specialization)
@@ -248,7 +219,7 @@ public class SemanticCheckVisitor : AutoVisitor
         try
         {
             // Создаем временную область видимости для параметров
-            var oldVarValuesCount = SymbolTable.VarValues.Count;
+           
             var oldSymbols = new Dictionary<string, SymbolInfo>(SymbolTable.SymTable);
 
             try
@@ -261,7 +232,9 @@ public class SemanticCheckVisitor : AutoVisitor
                     SymbolTable.AddVariable(param.Name, paramType);
                     specialization.LocalVariableTypes.Add(param.Name, paramType);
                 }
-
+                
+                
+                
                 // Обходим тело функции и собираем типы всех return statements
                 _currentCheckingFunctionSpecialization.Push(specialization);
                 functionDef.Definition.Body.VisitP(this);
@@ -287,12 +260,6 @@ public class SemanticCheckVisitor : AutoVisitor
             }
             finally
             {
-                // Восстанавливаем предыдущее состояние таблицы переменных
-                while (SymbolTable.VarValues.Count > oldVarValuesCount)
-                {
-                    SymbolTable.VarValues.RemoveAt(SymbolTable.VarValues.Count - 1);
-                }
-                
                 // Восстанавливаем таблицу символов
                 SymbolTable.SymTable.Clear();
                 foreach (var kvp in oldSymbols)
@@ -367,9 +334,6 @@ public class SemanticCheckVisitor : AutoVisitor
         {
             node.Expr.VisitP(this);
             var returnType = TypeChecker.CalcTypeVis(node.Expr);
-            
-            // Если мы внутри функции, можем использовать эту информацию для вывода типа
-            // Но основная логика теперь в CheckFunctionBodyWithSpecialization
         }
     }
 }

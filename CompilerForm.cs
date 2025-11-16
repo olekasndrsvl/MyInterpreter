@@ -113,10 +113,7 @@ namespace MyInterpreter
                      
                      
                      SymbolTable.PrintFunctionTable();
-                     // var generator = new GenerateVirtualMachineVisitor();
-                     // List<ThreeAddr> machineCode = generator.VisitNode(progr);
-                     //
-                     // VirtualMachine.RunProgram(machineCode);
+                    
                      var gen = new ThreeAddressCodeVisitor();
                      progr.VisitP(gen);
                      VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
@@ -128,16 +125,18 @@ namespace MyInterpreter
                      sw.Start();
                      VirtualMachine.Run();
                      sw.Stop();
+                     foreach (var VARIABLE in gen.GetFrameSizes())
+                     {
+                         Console.WriteLine(VARIABLE.Key+" "+VARIABLE.Value);
+                     }
+                     
+                     foreach (var VARIABLE in gen._currentTempIndexes)
+                     {
+                         Console.WriteLine(VARIABLE.Key+" "+VARIABLE.Value);
+                     }
+                     
                      CompilerForm.Instance.ChangeOutputBoxText($"Programm elapsed time: {sw.Elapsed}\n"); // Здесь логируем
-                     //var generator = new CodeGenerator();
-                     //List<SmallMachine.ThreeAddr> generatedCode = progr.Visit(generator);
-                     //generatedCode.Add(new SmallMachine.ThreeAddr(SmallMachine.Commands.stop));
-                     //SmallVirtualMachine.RunProgram(generatedCode);
-
-                     //SmallVirtualMachine.MemoryDump(5);
-                     
-                     //var rooti =progr.Visit(new ConvertASTToInterpretTreeVisitor()) as InterpreterTree.StatementNodeI;
-                     
+                   
                      
                     // outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
                      VirtualMachine.MemoryDump(1000);

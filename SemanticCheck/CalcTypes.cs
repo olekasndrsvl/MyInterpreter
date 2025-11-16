@@ -285,7 +285,7 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
         }
 
         // Создаем временную область видимости для параметров
-        var oldVarValuesCount = SymbolTable.VarValues.Count;
+      
         
         try
         {
@@ -313,11 +313,7 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
         }
         finally
         {
-            // Восстанавливаем предыдущее состояние таблицы переменных
-            while (SymbolTable.VarValues.Count > oldVarValuesCount)
-            {
-                SymbolTable.VarValues.RemoveAt(SymbolTable.VarValues.Count - 1);
-            }
+          
             
             // Удаляем параметры из таблицы символов
             foreach (var param in f.Params)

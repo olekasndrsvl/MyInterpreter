@@ -1,63 +1,6 @@
 ﻿namespace MyInterpreter
 {
-    // Маркер типа времени выполнения
-    public enum RTTypeMarker
-    {
-        Int,
-        Real,
-        Bool
-    }
-
-    // Значение времени выполнения
-    public class RuntimeValue
-    {
-        public int I { get; set; }
-        public double R { get; set; }
-        public bool B { get; set; }
-        public RTTypeMarker TypeMarker { get; set; }
-
-        public RuntimeValue(int ii)
-        {
-            I = ii;
-            TypeMarker = RTTypeMarker.Int;
-        }
-
-        public RuntimeValue(double rr)
-        {
-            R = rr;
-            TypeMarker = RTTypeMarker.Real;
-        }
-
-        public RuntimeValue(bool bb)
-        {
-            B = bb;
-            TypeMarker = RTTypeMarker.Bool;
-        }
-
-        public bool IsInt => TypeMarker == RTTypeMarker.Int;
-        public bool IsReal => TypeMarker == RTTypeMarker.Real;
-        public bool IsBool => TypeMarker == RTTypeMarker.Bool;
-
-        public override string ToString()
-        {
-            return TypeMarker switch
-            {
-                RTTypeMarker.Int => I.ToString(),
-                RTTypeMarker.Real => R.ToString(),
-                RTTypeMarker.Bool => B.ToString(),
-                _ => "Unknown"
-            };
-        }
-    }
-
-    // Вспомогательные методы для создания RuntimeValue
-    public static class RuntimeValueHelper
-    {
-        public static RuntimeValue Value(int i) => new RuntimeValue(i);
-        public static RuntimeValue Value(double r) => new RuntimeValue(r);
-        public static RuntimeValue Value(bool b) => new RuntimeValue(b);
-    }
-
+    
     // Семантические типы
     public enum SemanticType
     {
@@ -175,6 +118,8 @@
             Specializations.Add(newSpec);
             newSpec.SpecializationId = Specializations.Count - 1;
             return newSpec;
+            
+          
         }
         
         private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
@@ -184,7 +129,7 @@
 
             for (int i = 0; i < paramTypes.Length; i++)
             {
-                if (!SymbolTable.AreTypesCompatible(paramTypes[i], argTypes[i]))
+                if (paramTypes[i]!= argTypes[i])
                     return false;
             }
             return true;
@@ -226,8 +171,6 @@
     public static class SymbolTable
     {
         public static Dictionary<string, SymbolInfo> SymTable = new Dictionary<string, SymbolInfo>();
-        public static List<RuntimeValue> VarValues = new List<RuntimeValue>();
-        
         // Новая структура для хранения информации о функциях
         public static Dictionary<string, FunctionInfo> FunctionTable = new Dictionary<string, FunctionInfo>();
 
@@ -270,7 +213,7 @@
                 throw new InvalidOperationException($"Variable '{name}' already declared");
 
          
-            VarValues.Add(CreateDefaultValue(type));
+          
             SymTable[name] = new SymbolInfo(name, KindType.VarName, type);
          
         }
@@ -328,48 +271,10 @@
         public static void ResetSymbolTable()
         {
             SymTable.Clear();
-            VarValues.Clear();
+            
             FunctionTable.Clear();
         }
         
-     
-
-        public static void SetValue(string name, RuntimeValue value)
-        {
-            var symbol = Get(name);
-            if (symbol.Kind != KindType.VarName)
-                throw new InvalidOperationException($"'{name}' is not a variable");
-            //VarValues[symbol.Index] = value;
-        }
-
-        public static void SetIntValue(string name, int value)
-        {
-            SetValue(name, RuntimeValueHelper.Value(value));
-        }
-
-        public static void SetDoubleValue(string name, double value)
-        {
-            SetValue(name, RuntimeValueHelper.Value(value));
-        }
-
-        public static void SetBoolValue(string name, bool value)
-        {
-            SetValue(name, RuntimeValueHelper.Value(value));
-        }
-
-        // Создание значения по умолчанию для типа
-        private static RuntimeValue CreateDefaultValue(SemanticType type)
-        {
-            return type switch
-            {
-                SemanticType.IntType => RuntimeValueHelper.Value(0),
-                SemanticType.DoubleType => RuntimeValueHelper.Value(0.0),
-                SemanticType.BoolType => RuntimeValueHelper.Value(false),
-                SemanticType.AnyType => RuntimeValueHelper.Value(0),
-                _ => throw new ArgumentException($"Unsupported type: {type}")
-            };
-        }
-
         // Проверка совместимости типов
         public static bool AreTypesCompatible(SemanticType t1, SemanticType t2)
         {
@@ -408,6 +313,7 @@
             InitStandardFunctionsTable();
         }
 
+        
         // For debug
         public static void PrintSymbolTable()
         {
@@ -443,13 +349,6 @@
             }
         }
 
-        public static void PrintVariableValues()
-        {
-            Console.WriteLine("Variable Values:");
-            for (int i = 0; i < VarValues.Count; i++)
-            {
-                Console.WriteLine($"  [{i}]: {VarValues[i]} ({VarValues[i].TypeMarker})");
-            }
-        }
+      
     }
 }

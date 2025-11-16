@@ -234,12 +234,13 @@ public class VirtualMachine
 
     public static void Run()
     {
+        int temp = 0;
         if (_program == null)
             throw new InvalidOperationException("Программа не загружена!");
 
         _programCounter = 0;
         
-        while (_programCounter < _program.Length)
+        while (_programCounter < _program.Length )
         {
             var command = _program[_programCounter];
             ExecuteCommand(command);
@@ -248,6 +249,7 @@ public class VirtualMachine
                 break;
                 
             _programCounter++;
+            
         }
     }
 
@@ -262,7 +264,6 @@ public class VirtualMachine
     private static void ExecuteCommand(ThreeAddr cmd)
     {
         double TOLERANCE = 0.00000001;
-        Console.WriteLine(_currentFrameIndex);
         switch (cmd.command)
         {
             case Commands.icass when cmd.IValue != 0:
@@ -537,6 +538,7 @@ public class VirtualMachine
                 {
                     Mem[cmd.MemIndex] = tmp;
                 }
+                Console.WriteLine($"reg: i:{_returnValueRegister.i} r:{_returnValueRegister.r} b: {_returnValueRegister.b}");
                 break;
             
             case Commands.movin:
@@ -549,6 +551,7 @@ public class VirtualMachine
                 { 
                     _returnValueRegister = Mem[cmd.MemIndex];
                 }
+                
                 break;
             
             case Commands.go:
@@ -582,13 +585,14 @@ public class VirtualMachine
             var value = Mem[_currentFrameIndex]; 
             if (Math.Abs(value.r) > 0.000001)
             {
-                CompilerForm.Instance.ChangeOutputBoxText(value.r.ToString("F6"));
+                CompilerForm.Instance.ChangeOutputBoxText(value.r.ToString("F6")+'\n');
             }
             else
             {
-                CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString());
+                CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString()+'\n');
             }
-            _currentFrameIndex= _currentFrameStack.Pop().Item1;
+            _currentFrameStack.Pop();
+            _currentFrameIndex= _currentFrameStack.Peek().Item1;
         }
         else
         {
