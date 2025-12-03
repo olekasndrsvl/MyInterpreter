@@ -1,4 +1,6 @@
-﻿namespace MyInterpreter;
+﻿using MyInterpreter.SemanticCheck;
+
+namespace MyInterpreter;
 
 public interface IVisitor<T>
 {

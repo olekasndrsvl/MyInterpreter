@@ -579,6 +579,7 @@ public class VirtualMachine
 
     private static void ExecutePrintFunction()
     {
+        Console.WriteLine("x: "+ Mem[0].i);
         Console.WriteLine("print:"+_currentFrameIndex);
         if (_currentFrameIndex > 0)
         {

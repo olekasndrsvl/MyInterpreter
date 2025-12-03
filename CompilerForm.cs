@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using static MyInterpreter.FormatCodeVisitor;
 using System.Threading;
 using MyInterpreter.Common;
+using MyInterpreter.SemanticCheck;
 
 
 namespace MyInterpreter
@@ -104,18 +105,27 @@ namespace MyInterpreter
                  outputTextBox.Clear();
                  try
                  {
+                     SymbolTable.ResetSymbolTable();
+                     SemanticCheckVisitor.Reset();
+                     FrameSizeVisitor.Reset();
                      
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
-                     SymbolTable.ResetSymbolTable();
+                  
                      var  sv = new SemanticCheckVisitor();
                      progr.VisitP(sv);
                      
                      
                      SymbolTable.PrintFunctionTable();
-                    
+                     var frame_gen = new FrameSizeVisitor();
+                     progr.VisitP(frame_gen);
+                     
                      var gen = new ThreeAddressCodeVisitor();
                      progr.VisitP(gen);
+                    
+    
+                     var framesize = FrameSizeVisitor.FrameSizes;
+                     
                      VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
                      var code = gen.GetCode();
                      VirtualMachine.LoadProgram(code);
@@ -136,12 +146,28 @@ namespace MyInterpreter
                      }
                      
                      CompilerForm.Instance.ChangeOutputBoxText($"Programm elapsed time: {sw.Elapsed}\n"); // Здесь логируем
-                   
+                     // var sw1 = new Stopwatch();
+                     // sw1.Start();
+                     // var x = 1;
+                     // while (x < 100000000)
+                     // {
+                     //     x += 1;
+                     //     if(x<1000 && x>1)
+                     //         Console.WriteLine(x);
+                     // }
+                     //
+                     // Console.WriteLine(sw1.Elapsed);
+                     // sw1.Stop();
+                     //
+                     
                      
                     // outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
                      VirtualMachine.MemoryDump(1000);
                      //await RunProgramm(rooti);
                      VirtualMachine.ResetVirtualMachine();
+                     
+                     
+                     
                  }
                  catch (CompilerExceptions.BaseCompilerException ex)
                  {

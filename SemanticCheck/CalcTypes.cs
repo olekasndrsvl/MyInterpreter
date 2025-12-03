@@ -1,7 +1,8 @@
 ﻿using MyInterpreter;
+using MyInterpreter.SemanticCheck;
 
 namespace MyInterpreter;
-using static MyInterpreter.SymbolTable;
+using static SymbolTable;
 
 public static class TypeChecker
 {
@@ -17,19 +18,22 @@ public static class TypeChecker
             return false;
     }
     
-    public static SemanticType CalcTypeVis(ExprNode ex) => ex.Visit(new CalcTypeVisitor());
+    public static SemanticType CalcTypeVis(ExprNode ex, FunctionSpecialization context)
+    { 
+        return ex.Visit(new CalcTypeVisitor(context));
+    }
 
     // Альтернативная реализация без визитора с использованием pattern matching
-    public static SemanticType CalcType(ExprNode ex)
+    public static SemanticType CalcType(ExprNode ex, FunctionSpecialization context)
     {
         switch (ex)
         {
             case FuncCallNode funccall:
-                return CalcTypeVis(funccall);
+                return CalcTypeVis(funccall, context);
             
             case IdNode id:
-                if (SymbolTable.SymTable.ContainsKey(id.Name))
-                    return SymbolTable.SymTable[id.Name].Type;
+                if (context.LocalVariableTypes.ContainsKey(id.Name))
+                    return context.LocalVariableTypes[id.Name].Type;
                 else
                     return SemanticType.BadType;
         
@@ -40,8 +44,8 @@ public static class TypeChecker
                 return SemanticType.DoubleType;
         
             case BinOpNode bin:
-                var lt = CalcType(bin.Left);
-                var rt = CalcType(bin.Right);
+                var lt = CalcType(bin.Left, context);
+                var rt = CalcType(bin.Right, context);
             
                 if (Constants.ArithmeticOperations.Contains(bin.Op))
                 {
@@ -96,6 +100,13 @@ public static class TypeChecker
 
 public class CalcTypeVisitor : IVisitor<SemanticType>
 {
+    private readonly FunctionSpecialization _context;
+
+    public CalcTypeVisitor(FunctionSpecialization context)
+    {
+        _context = context;
+    }
+
     public SemanticType CalcTypeVis(ExprNode ex) => ex.Visit(this);
     
     public SemanticType VisitNode(Node bin) => SemanticType.NoType;
@@ -148,10 +159,10 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     
     public SemanticType VisitId(IdNode id)
     {
-        if (!SymbolTable.SymTable.ContainsKey(id.Name))
+        if (!_context.LocalVariableTypes.ContainsKey(id.Name))
              CompilerExceptions.SemanticError("Идентификатор " + id.Name + " не определен", id.Pos);
         else 
-            return SymbolTable.SymTable[id.Name].Type;
+            return _context.LocalVariableTypes[id.Name].Type;
         
         return SemanticType.BadType;
     }
@@ -168,40 +179,10 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     
     public SemanticType VisitProcCall(ProcCallNode f)
     {
-        if (!SymbolTable.SymTable.ContainsKey(f.Name.Name))
+        if (!FunctionTable.ContainsKey(f.Name.Name))
              CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
         
-        var sym = SymbolTable.SymTable[f.Name.Name];
-        if (sym.Kind != KindType.FuncName)
-             CompilerExceptions.SemanticError("Данное имя " + f.Name.Name + " не является именем функции", f.Name.Pos);
-        
-        if (sym.Type != SemanticType.NoType) // Это функция
-             CompilerExceptions.SemanticError("Попытка вызвать функцию " + f.Name.Name + " как процедуру", f.Name.Pos);
-        
-        if (sym.Params.Count() != f.Pars.lst.Count)
-             CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове процедуры " + f.Name.Name, f.Name.Pos);
-        
-        for (int i = 0; i < sym.Params.Count(); i++)
-        {
-            var tp = CalcTypeVis(f.Pars.lst[i]);
-            if (!TypeChecker.AssignComparable(sym.Params[i], tp))
-                CompilerExceptions.SemanticError("Тип аргумента процедуры " + tp.ToString() + " не соответствует типу формального параметра " + sym.Params[i].ToString(), f.Name.Pos);
-        }
-        
-        return SemanticType.NoType;
-    }
-    
-    public SemanticType VisitFuncCall(FuncCallNode f)
-    {
-        if (!SymbolTable.SymTable.ContainsKey(f.Name.Name))
-            CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
-        
-        var sym = SymbolTable.SymTable[f.Name.Name];
-        if (sym.Kind != KindType.FuncName)
-            CompilerExceptions.SemanticError("Данное имя " + f.Name.Name + " не является именем функции", f.Name.Pos);
-        
-        if (sym.Type == SemanticType.NoType) // Это процедура
-            CompilerExceptions.SemanticError("Попытка вызвать процедуру " + f.Name.Name + " как функцию", f.Name.Pos);
+        var funcInfo = FunctionTable[f.Name.Name];
         
         // Вычисляем типы аргументов
         var argTypes = new List<SemanticType>();
@@ -209,202 +190,116 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
         {
             argTypes.Add(CalcTypeVis(arg));
         }
+        // Для стандартных функций используем специализацию по умолчанию
+        FunctionSpecialization spec;
+        if (funcInfo.Specializations.Count > 0)
+        {
+            spec = funcInfo.Specializations[0];
+        }
+        else
+        {
+            spec = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
+        }
+
+        if (spec.ReturnType != SemanticType.NoType)
+             CompilerExceptions.SemanticError("Попытка вызвать функцию " + f.Name.Name + " как процедуру", f.Name.Pos);
         
-        // Получаем информацию о функции с учетом выведенных типов
-        var functionSymbol = GetFunctionWithInferredTypes(f.Name.Name, argTypes);
+        if (funcInfo.Definition?.Params.Count != f.Pars.lst.Count)
+             CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове процедуры " + f.Name.Name, f.Name.Pos);
         
-        if (functionSymbol.Params.Count() != f.Pars.lst.Count)
-            CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове функции " + f.Name.Name, f.Name.Pos);
+        for (int i = 0; i < f.Pars.lst.Count; i++)
+        {
+            var tp = CalcTypeVis(f.Pars.lst[i]);
+            if (i < spec.ParameterTypes.Length && !TypeChecker.AssignComparable(spec.ParameterTypes[i], tp))
+                CompilerExceptions.SemanticError("Тип аргумента процедуры " + tp.ToString() + " не соответствует типу формального параметра " + spec.ParameterTypes[i].ToString(), f.Name.Pos);
+        }
         
+        return SemanticType.NoType;
+    }
+    
+    public SemanticType VisitFuncCall(FuncCallNode f)
+    {
+        if (!FunctionTable.ContainsKey(f.Name.Name))
+            CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
+        
+        var funcInfo = FunctionTable[f.Name.Name];
+        
+        // Вычисляем типы аргументов
+        var argTypes = new List<SemanticType>();
+        foreach (var arg in f.Pars.lst)
+        {
+            argTypes.Add(CalcTypeVis(arg));
+        }
+
+        // Для стандартных функций используем предопределенные специализации
+        FunctionSpecialization specialization;
+        if (IsStandardFunction(f.Name.Name))
+        {
+            specialization = FindMatchingStandardSpecialization(f.Name.Name, argTypes.ToArray());
+            if (specialization == null)
+            {
+                CompilerExceptions.SemanticError($"Нет подходящей специализации для функции {f.Name.Name} с аргументами {string.Join(", ", argTypes)}", f.Name.Pos);
+                return SemanticType.BadType;
+            }
+        }
+        else
+        {
+            // Для пользовательских функций создаем/находим специализацию
+            specialization = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
+        }
+
         // Проверяем совместимость типов аргументов
-        for (int i = 0; i < functionSymbol.Params.Count(); i++)
+        for (int i = 0; i < specialization.ParameterTypes.Length; i++)
         {
             var argType = argTypes[i];
-            var paramType = functionSymbol.Params[i];
+            var paramType = specialization.ParameterTypes[i];
             
             if (!TypeChecker.AssignComparable(paramType, argType))
                 CompilerExceptions.SemanticError($"Тип аргумента функции {argType} не соответствует типу формального параметра {paramType}", f.Name.Pos);
         }
         
-        return functionSymbol.Type; // тип возвращаемого значения (выведенный)
+        return specialization.ReturnType;
     }
 
-    // Метод для получения информации о функции с учетом вывода типов
-    private SymbolInfo GetFunctionWithInferredTypes(string functionName, List<SemanticType> argumentTypes)
+    private bool IsStandardFunction(string functionName)
     {
-        if (!SymbolTable.SymTable.ContainsKey(functionName) || SymbolTable.SymTable[functionName].Kind != KindType.FuncName)
-            throw new KeyNotFoundException($"Function '{functionName}' not found");
-
-        var functionSymbol = SymbolTable.SymTable[functionName];
-        
-        // Если функция уже имеет конкретные типы, возвращаем их
-        if (functionSymbol.Params.All(t => t != SemanticType.AnyType) && 
-            functionSymbol.Type != SemanticType.AnyType)
-            return functionSymbol;
-
-        // Выводим типы параметров на основе аргументов
-        var inferredParamTypes = new List<SemanticType>();
-        for (int i = 0; i < argumentTypes.Count; i++)
-        {
-            if (i < functionSymbol.Params.Length && functionSymbol.Params[i] == SemanticType.AnyType)
-                inferredParamTypes.Add(argumentTypes[i]);
-            else if (i < functionSymbol.Params.Length)
-                inferredParamTypes.Add(functionSymbol.Params[i]); // Уже имеет конкретный тип
-            else
-                inferredParamTypes.Add(argumentTypes[i]); // Новый параметр
-        }
-
-        // Выводим тип возвращаемого значения (упрощенно - берем тип первого параметра)
-        SemanticType inferredReturnType = functionSymbol.Type;
-        if (inferredReturnType == SemanticType.AnyType && inferredParamTypes.Count > 0)
-            inferredReturnType = inferredParamTypes[0];
-
-        // Обновляем типы функции
-        UpdateFunctionTypes(functionName, inferredParamTypes.ToArray(), inferredReturnType);
-        
-        return SymbolTable.SymTable[functionName];
+        return functionName == "Sqrt" || functionName == "Print" || functionName == "Sin" || 
+               functionName == "Cos" || functionName == "Abs" || functionName == "Round" ||
+               functionName == "Pow" || functionName == "Max" || functionName == "Min" || 
+               functionName == "ToString";
     }
 
-    // Метод для обновления типов функции
-    private void UpdateFunctionTypes(string functionName, SemanticType[] newParamTypes, SemanticType newReturnType)
+    private FunctionSpecialization FindMatchingStandardSpecialization(string functionName, SemanticType[] argTypes)
     {
-        if (!SymbolTable.SymTable.ContainsKey(functionName) || SymbolTable.SymTable[functionName].Kind != KindType.FuncName)
-            throw new InvalidOperationException($"Function '{functionName}' not found");
+        if (!FunctionTable.ContainsKey(functionName))
+            return null;
 
-        var oldSymbol = SymbolTable.SymTable[functionName];
-        SymbolTable.SymTable[functionName] = new SymbolInfo(functionName, KindType.FuncName, newParamTypes, newReturnType);
-    }
-
-    public SemanticType VisitFuncDef(FuncDefNode f)
-    {
-        // Проверяем, не объявлена ли уже функция с таким именем
-        if (SymbolTable.SymTable.ContainsKey(f.Name.Name))
+        var funcInfo = FunctionTable[functionName];
+        foreach (var spec in funcInfo.Specializations)
         {
-            CompilerExceptions.SemanticError($"Функция '{f.Name.Name}' уже объявлена", f.Name.Pos);
-            return SemanticType.NoType;
-        }
-
-        // Создаем временную область видимости для параметров
-      
-        
-        try
-        {
-            // Добавляем параметры в таблицу символов с типом AnyType
-            var paramTypes = new List<SemanticType>();
-            foreach (var param in f.Params)
+            if (AreParameterTypesCompatible(spec.ParameterTypes, argTypes))
             {
-                // Для параметров используем AnyType - тип будет выведен при вызове
-                SymbolTable.AddVariable(param.Name, SemanticType.AnyType);
-                paramTypes.Add(SemanticType.AnyType);
-               
-            }
-
-            // Устанавливаем тип возвращаемого значения как AnyType
-            f.ReturnType = SemanticType.AnyType;
-            
-            // Добавляем функцию в таблицу символов с типами AnyType
-            SymbolTable.AddFunction(f.Name.Name, paramTypes.ToArray(), SemanticType.AnyType);
-            
-            // Проверяем тело функции
-            f.Body.Visit(this);
-            
-            // Пытаемся вывести тип возвращаемого значения из return statements
-            InferReturnTypeFromBody(f);
-        }
-        finally
-        {
-          
-            
-            // Удаляем параметры из таблицы символов
-            foreach (var param in f.Params)
-            {
-                SymbolTable.SymTable.Remove(param.Name);
+                return spec;
             }
         }
-        
-        return SemanticType.NoType;
+        return null;
     }
 
-    // Метод для вывода типа возвращаемого значения из тела функции
-    private void InferReturnTypeFromBody(FuncDefNode funcDef)
+    private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
     {
-        var returnTypes = new List<SemanticType>();
-        CollectReturnTypes(funcDef.Body, returnTypes);
-        
-        if (returnTypes.Count > 0)
+        if (paramTypes.Length != argTypes.Length)
+            return false;
+
+        for (int i = 0; i < paramTypes.Length; i++)
         {
-            // Выводим общий тип из всех return statements
-            SemanticType inferredType = returnTypes[0];
-            foreach (var returnType in returnTypes)
-            {
-                if (returnType != inferredType)
-                {
-                    // Если типы разные, используем более общий тип
-                    if ((inferredType == SemanticType.IntType && returnType == SemanticType.DoubleType) ||
-                        (inferredType == SemanticType.DoubleType && returnType == SemanticType.IntType))
-                    {
-                        inferredType = SemanticType.DoubleType;
-                    }
-                    else
-                    {
-                        CompilerExceptions.SemanticError(
-                            $"Несогласованные типы возвращаемых значений в функции '{funcDef.Name.Name}': {inferredType} и {returnType}", 
-                            funcDef.Name.Pos);
-                    }
-                }
-            }
-            
-            // Обновляем тип возвращаемого значения функции
-            funcDef.ReturnType = inferredType;
-            UpdateFunctionTypes(funcDef.Name.Name, 
-                funcDef.Params.Select(p => SemanticType.AnyType).ToArray(), 
-                inferredType);
+            if (!TypeChecker.AssignComparable(paramTypes[i], argTypes[i]))
+                return false;
         }
+        return true;
     }
 
-    // Рекурсивный сбор типов из return statements
-    private void CollectReturnTypes(StatementNode node, List<SemanticType> returnTypes)
-    {
-        if (node is ReturnNode returnNode && returnNode.Expr != null)
-        {
-            returnTypes.Add(CalcTypeVis(returnNode.Expr));
-        }
-        else if (node is StatementListNode statementList)
-        {
-            foreach (var stmt in statementList.lst)
-            {
-                CollectReturnTypes(stmt, returnTypes);
-            }
-        }
-        else if (node is IfNode ifNode)
-        {
-            CollectReturnTypes(ifNode.ThenStat, returnTypes);
-            if (ifNode.ElseStat != null)
-            {
-                CollectReturnTypes(ifNode.ElseStat, returnTypes);
-            }
-        }
-        else if (node is WhileNode whileNode)
-        {
-            CollectReturnTypes(whileNode.Stat, returnTypes);
-        }
-    }
-
-    public SemanticType VisitReturn(ReturnNode r)
-    {
-        if (r.Expr != null)
-        {
-            var returnType = CalcTypeVis(r.Expr);
-            // Проверяем, что возвращаемый тип допустим
-            if (returnType == SemanticType.BadType || returnType == SemanticType.NoType)
-                CompilerExceptions.SemanticError("Недопустимый тип возвращаемого значения: " + returnType, r.Pos);
-            
-            return returnType;
-        }
-        return SemanticType.NoType;
-    }
-
+    public SemanticType VisitFuncDef(FuncDefNode f) => SemanticType.NoType;
+    public SemanticType VisitReturn(ReturnNode r) => SemanticType.NoType;
     public SemanticType VisitFuncDefList(FuncDefListNode lst) => SemanticType.NoType;
-
     public SemanticType VisitFunDefAndStatements(FuncDefAndStatements fdandStmts) => SemanticType.NoType;
 }
