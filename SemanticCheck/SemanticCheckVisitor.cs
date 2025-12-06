@@ -158,15 +158,49 @@ public class SemanticCheckVisitor : AutoVisitor
         var paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
         var funcSpec = new FunctionSpecialization();
         
+        
+        
         // Тут проверим тело функции для AnyType
         funcSpec.ParameterTypes= paramTypes;
+        for (int i = 0; i <  FunctionTable[node.Name.Name].Definition.Params.Count; i++)
+        {
+            var param =  FunctionTable[node.Name.Name].Definition.Params[i];
+            var paramType = funcSpec.ParameterTypes[i];
+            funcSpec.LocalVariableTypes.Add(param.Name, new SymbolInfo(param.Name, KindType.VarName, paramType));
+        }
         
+        _currentCheckingFunctionSpecialization.Push(funcSpec);
+                
+        var returnTypes = new List<SemanticType>();
+        CollectReturnTypes( FunctionTable[node.Name.Name].Definition.Body, returnTypes);
+
+        // Выводим тип возвращаемого значения
+        if (returnTypes.Count > 0)
+        {
+            // Находим общий тип всех return statements
+            SemanticType inferredReturnType = returnTypes[0];
+            for (int i = 1; i < returnTypes.Count; i++)
+            {
+                inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
+            }
+            funcSpec.ReturnType = inferredReturnType;
+        }
+        else
+        {
+            // Если нет return statements, то тип NoType
+            funcSpec.ReturnType = SemanticType.NoType;
+        }
         
         // Инициализируем специализации для этой функции
         if (FunctionTable.ContainsKey(node.Name.Name))
         {
             FunctionTable[node.Name.Name].Specializations =new List<FunctionSpecialization>();
         }
+        
+        node.Body.VisitP(this);
+        
+        if(_currentCheckingFunctionSpecialization.Count>1)
+            _currentCheckingFunctionSpecialization.Pop();
     }
 
     public override void VisitFuncCall(FuncCallNode f)
@@ -286,8 +320,7 @@ public class SemanticCheckVisitor : AutoVisitor
             }
             finally
             {
-                // Восстанавливаем таблицу символов
-              
+                
                 if(_currentCheckingFunctionSpecialization.Count>1)
                     _currentCheckingFunctionSpecialization.Pop();
             }
