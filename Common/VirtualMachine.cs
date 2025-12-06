@@ -263,7 +263,7 @@ public class VirtualMachine
 
     private static void ExecuteCommand(ThreeAddr cmd)
     {
-        double TOLERANCE = 0.00000001;
+        double TOLERANCE = Double.Epsilon;
         switch (cmd.command)
         {
             case Commands.icass when cmd.IValue != 0:
@@ -415,22 +415,22 @@ public class VirtualMachine
 
             case Commands.ic2ge:
                 SetBoolValue(cmd.MemIndex, cmd.isInDirectAddressing1,
-                            GetIntValue(cmd.Op1Index, cmd.isInDirectAddressing2) >= cmd.IValue);
+                            GetIntValue(cmd.Op1Index, cmd.isInDirectAddressing2) >=  GetIntValue(cmd.Op2Index, cmd.isInDirectAddressing3));
                 break;
             
             case Commands.rc2ge:
                 SetBoolValue(cmd.MemIndex, cmd.isInDirectAddressing1,
-                            GetRealValue(cmd.Op1Index, cmd.isInDirectAddressing2) >= cmd.RValue);
+                            GetRealValue(cmd.Op1Index, cmd.isInDirectAddressing2) >=  GetRealValue(cmd.Op2Index, cmd.isInDirectAddressing3));
                 break;
             
             case Commands.ic2le:
                 SetBoolValue(cmd.MemIndex, cmd.isInDirectAddressing1,
-                            GetIntValue(cmd.Op1Index, cmd.isInDirectAddressing2) <= cmd.IValue);
+                            GetIntValue(cmd.Op1Index, cmd.isInDirectAddressing2) <= GetIntValue(cmd.Op2Index, cmd.isInDirectAddressing3));
                 break;
 
             case Commands.rc2le:
                 SetBoolValue(cmd.MemIndex, cmd.isInDirectAddressing1,
-                            GetRealValue(cmd.Op1Index, cmd.isInDirectAddressing2) <= cmd.RValue);
+                            GetRealValue(cmd.Op1Index, cmd.isInDirectAddressing2) <=  GetRealValue(cmd.Op2Index, cmd.isInDirectAddressing3));
                 break;
             
             case Commands.iif:

@@ -717,8 +717,30 @@ public class ThreeAddressCodeVisitor : IVisitorP
     public void VisitReturn(ReturnNode r)
     {
         r.Expr.VisitP(this);
-        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.movin, _tempCounter-1,true));
-        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.creturn));
+
+        SemanticType returnType = TypeChecker.CalcType(r.Expr, _currentGeneratingFunctionSpecialization.Peek());
+
+        if (returnType == SemanticType.IntType &&
+            _currentGeneratingFunctionSpecialization.Peek().ReturnType == SemanticType.DoubleType)
+        {
+            int convertedTemp = NewTemp();
+            _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.CreateConvert(Commands.citr, _tempCounter-2, convertedTemp,true,true));
+            _function_codes[_currentGeneratingFunctionName.Peek()]
+                .Add(ThreeAddr.Create(Commands.movin, convertedTemp, true));
+            _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.creturn));
+            return;
+        }
+        
+        if(returnType ==  _currentGeneratingFunctionSpecialization.Peek().ReturnType)
+        {
+            _function_codes[_currentGeneratingFunctionName.Peek()]
+                .Add(ThreeAddr.Create(Commands.movin, _tempCounter - 1, true));
+            _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.creturn));
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException("Something went wrong during generation code for return in function:"+_currentGeneratingFunctionName.Peek()+ returnType+  _currentGeneratingFunctionSpecialization.Peek().ReturnType );
+        }
     }
 
   
