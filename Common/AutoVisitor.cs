@@ -53,7 +53,7 @@ public class AutoVisitor : IVisitorP
         whn.Stat.VisitP(this);
     }
 
-    public void VisitFor(ForNode forNode)
+    public virtual void VisitFor(ForNode forNode)
     {
         forNode.Counter.VisitP(this);
         forNode.Condition.VisitP(this);

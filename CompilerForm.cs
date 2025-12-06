@@ -107,7 +107,7 @@ namespace MyInterpreter
                  {
                      SymbolTable.ResetSymbolTable();
                      SemanticCheckVisitor.Reset();
-                     FrameSizeVisitor.Reset();
+                     
                      
                      Parser parser = new Parser(lex);
                      var progr = parser.MainProgram();
@@ -121,12 +121,13 @@ namespace MyInterpreter
                      progr.VisitP(frame_gen);
                      
                      var gen = new ThreeAddressCodeVisitor();
+                     gen.GiveFrameSizes(frame_gen.GetFrameSizes());
                      progr.VisitP(gen);
                     
     
-                     var framesize = FrameSizeVisitor.FrameSizes;
+                     var framesize = frame_gen.GetFrameSizes();
                      
-                     VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
+                     VirtualMachine.GiveFrameSize(frame_gen.GetFrameSizes());
                      var code = gen.GetCode();
                      VirtualMachine.LoadProgram(code);
                      VirtualMachine.MemoryDump(1000);
@@ -135,7 +136,7 @@ namespace MyInterpreter
                      sw.Start();
                      VirtualMachine.Run();
                      sw.Stop();
-                     foreach (var VARIABLE in gen.GetFrameSizes())
+                     foreach (var VARIABLE in frame_gen.GetFrameSizes())
                      {
                          Console.WriteLine(VARIABLE.Key+" "+VARIABLE.Value);
                      }

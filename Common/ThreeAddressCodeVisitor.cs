@@ -23,11 +23,15 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
     public ThreeAddressCodeVisitor()
     {
-       
         _currentGeneratingFunctionName.Push("MainFrame");
         _variableAddresses.Add("MainFrame", new Dictionary<string, int>());
         _currentGeneratingFunctionSpecialization.Push(SymbolTable.FunctionTable["Main"].Specializations.First());
         _tempCounter = SymbolTable.FunctionTable["Main"].Specializations.First().LocalVariableTypes.Count(x => x.Value.Kind == KindType.VarName);
+    }
+
+    public void GiveFrameSizes(Dictionary<string, int> frameSizes)
+    {
+        _frameSizes= frameSizes;
     }
     
     // Таблица для бинарных операций: (тип_левого, тип_правого, токен) -> команда
@@ -110,7 +114,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
             _code.AddRange(x.Value);
         }
        
-        
+        _currentTempIndexes[_currentGeneratingFunctionName.Peek()] = _tempCounter;
         var tmp =_currentGeneratingFunctionName.Pop();
         if (tmp != "MainFrame")
         {
