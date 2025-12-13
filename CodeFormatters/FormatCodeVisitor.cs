@@ -35,7 +35,7 @@ public class FormatCodeVisitor : IVisitor<string>
     public string VisitDouble(DoubleNode d) => d.Val.ToString().Replace(',','.');
     public string VisitId(IdNode id) => id.Name;
 
-    public string VisitAssign(AssignNode ass) => Ind()+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
+    public string VisitAssign(AssignNode ass) => Ind()+ (ass.HasVar?"var ":"")+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
     public string VisitAssignOp(AssignOpNode ass) => ass.ToString();
 
     public string VisitIf(IfNode ifn)
@@ -63,6 +63,12 @@ public class FormatCodeVisitor : IVisitor<string>
         result += string.Join(";\n", statements);
         result += IndDec() + "\n" + Ind() + "}";
         return result;
+    }
+
+    public string VisitBlockNode(BlockNode bin)
+    {
+       return bin.lst.Visit(this);
+        
     }
 
     public string VisitExprList(ExprListNode exlist) =>

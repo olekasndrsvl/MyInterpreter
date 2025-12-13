@@ -181,7 +181,7 @@ public enum TokenType
     tkAnd, tkOr, tkNot,
     Eof, 
     tkTrue, tkFalse, tkIf, tkThen, tkElse, tkWhile, tkDo, tkFor,
-    tkDef,  tkReturn,
+    tkDef,  tkReturn, tkVar,
 }
 
 
@@ -211,6 +211,7 @@ public partial class Lexer : LexerBase<TokenType>
             ["for"] = TokenType.tkFor,
             ["def"] = TokenType.tkDef,
             ["return"] = TokenType.tkReturn,
+            ["var"] =TokenType.tkVar,
         };
 
         public Lexer(string code) : base(code) { }

@@ -150,7 +150,9 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     }
     
     public SemanticType VisitStatementList(StatementListNode stl) => SemanticType.NoType;
-    
+    public SemanticType VisitBlockNode(BlockNode bin) => SemanticType.NoType;
+   
+
     public SemanticType VisitExprList(ExprListNode exlist) => SemanticType.NoType;
     
     public SemanticType VisitInt(IntNode n) => SemanticType.IntType;

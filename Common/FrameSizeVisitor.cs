@@ -79,7 +79,12 @@ public class FrameSizeVisitor : IVisitorP
             st.VisitP(this);
         }
     }
-    
+
+    public void VisitBlockNode(BlockNode bin)
+    {
+        throw new NotImplementedException();
+    }
+
     public void VisitExprList(ExprListNode exlist)
     {
         foreach (var ex in exlist.lst)

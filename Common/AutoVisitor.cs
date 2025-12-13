@@ -21,6 +21,11 @@ public class AutoVisitor : IVisitorP
             x.VisitP(this);
     }
 
+    public void VisitBlockNode(BlockNode bin)
+    {
+        bin.lst.VisitP(this);
+    }
+
     public virtual void VisitExprList(ExprListNode exlist)
     {
         foreach (var x in exlist.lst)

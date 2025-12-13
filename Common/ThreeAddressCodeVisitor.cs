@@ -240,6 +240,11 @@ public class ThreeAddressCodeVisitor : IVisitorP
         }
     }
 
+    public void VisitBlockNode(BlockNode bin)
+    {
+        throw new NotImplementedException();
+    }
+
     public void VisitExprList(ExprListNode exlist)
     {
         foreach (var ex in exlist.lst)

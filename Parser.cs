@@ -75,7 +75,7 @@ public abstract class ParserBase<TokenType>
 // StatementList := Statement (';' Statement)*
 // Statement := Assign | ProcCall | IfStatement | WhileStatement | ForStatement | BlockStatement | ReturnStatement
 // FuncDef := def Id '(' IdList ')' Statement
-// Assign := Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
+// Assign := (var| E) Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
 // ProcCall := Id '(' ExprList ')
 // FuncCall := Id '(' ExprList ')
 // WhileStatement := while Expr do Statement
@@ -175,6 +175,8 @@ public class Parser : ParserBase<TokenType>
             return BlockStatement();
         else if (At(TokenType.tkReturn))
             return ReturnStatement();
+        else if (At(TokenType.tkVar))
+             return VariableDeclaration();
         else if (At(TokenType.Id))
         {
             var id = Ident();
@@ -182,7 +184,7 @@ public class Parser : ParserBase<TokenType>
 
             if (At(TokenType.Assign) || At(TokenType.AssignPlus) || At(TokenType.AssignMinus) || 
                 At(TokenType.AssignMult) || At(TokenType.AssignDiv))
-                return ParseAssignment(id, pos);
+                return ParseAssignment(id, false, pos);
             else if (At(TokenType.LPar))
                 return ParseProcedureCall(id, pos);
             else
@@ -195,12 +197,12 @@ public class Parser : ParserBase<TokenType>
         return null;
     }
 
-    private StatementNode ParseAssignment(IdNode id, int pos)
+    private StatementNode ParseAssignment(IdNode id, bool hasVar, int pos)
     {
         if (IsMatch(TokenType.Assign))
         {
             var ex = Expr();
-            return new AssignNode(id, ex, new Position(lex.GetLineNumber(), pos));
+            return new AssignNode(id, ex, hasVar, new Position(lex.GetLineNumber(), pos));
         }
         else if (IsMatch(TokenType.AssignPlus))
         {
@@ -230,6 +232,14 @@ public class Parser : ParserBase<TokenType>
         }
     }
 
+    private StatementNode VariableDeclaration()
+    {
+        var pos = CurrentToken().Pos;
+        Requires(TokenType.tkVar);
+        var id = Ident();
+        return ParseAssignment(id, true, pos);
+    
+    }
     private StatementNode ParseProcedureCall(IdNode id, int pos)
     {
         Requires(TokenType.LPar);
@@ -314,6 +324,7 @@ public class Parser : ParserBase<TokenType>
         return stl;
     }
 
+    
     public StatementNode ReturnStatement()
     {
         var pos = CurrentToken().Pos;

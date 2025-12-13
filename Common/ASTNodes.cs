@@ -9,6 +9,7 @@ public interface IVisitor<T>
     T VisitStatementNode(StatementNode bin);
     T VisitBinOp(BinOpNode bin);
     T VisitStatementList(StatementListNode stl);
+    T VisitBlockNode(BlockNode bin);
     T VisitExprList(ExprListNode exlist);
     T VisitInt(IntNode n);
     T VisitDouble(DoubleNode d);
@@ -33,6 +34,7 @@ public interface IVisitorP
     void VisitStatementNode(StatementNode bin);
     void VisitBinOp(BinOpNode bin);
     void VisitStatementList(StatementListNode stl);
+    void VisitBlockNode(BlockNode bin);
     void VisitExprList(ExprListNode exlist);
     void VisitInt(IntNode n);
     void VisitDouble(DoubleNode d);
@@ -198,10 +200,12 @@ public class AssignNode : StatementNode
 {
     public IdNode Ident { get; set; }
     public ExprNode Expr { get; set; }
+    public bool HasVar { get; set; }
     
-    public AssignNode(IdNode Ident, ExprNode Expr, Position p = null)
+    public AssignNode(IdNode Ident, ExprNode Expr, bool hasvar =false, Position p = null)
     {
         this.Ident = Ident;
+        HasVar = hasvar;
         this.Expr = Expr;
         Pos = p;
     }
@@ -240,6 +244,20 @@ public class AssignOpNode : StatementNode
     public override void VisitP(IVisitorP v) => v.VisitAssignOp(this);
 }
 
+
+public class BlockNode : StatementNode
+{
+    public StatementListNode lst;
+    
+    // place for link in symbol table
+    
+    public void Add(StatementNode st) => lst.Add(st);
+    public override string ToString() => string.Join("; ", lst);
+    
+    public override T Visit<T>(IVisitor<T> v) => v.VisitBlockNode(this);
+    public override void VisitP(IVisitorP v) => v.VisitBlockNode(this);
+    
+}
 public class IfNode : StatementNode
 {
     public ExprNode Condition { get; set; }
