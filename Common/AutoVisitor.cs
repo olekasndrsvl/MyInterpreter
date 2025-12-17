@@ -21,7 +21,7 @@ public class AutoVisitor : IVisitorP
             x.VisitP(this);
     }
 
-    public void VisitBlockNode(BlockNode bin)
+    public virtual void VisitBlockNode(BlockNode bin)
     {
         bin.lst.VisitP(this);
     }
@@ -42,6 +42,18 @@ public class AutoVisitor : IVisitorP
     {
         ass.Ident.VisitP(this);
         ass.Expr.VisitP(this);
+    }
+
+    public virtual void VisitVarAssign(VarAssignNode ass)
+    {
+        ass.Ident.VisitP(this);
+        ass.Expr.VisitP(this);
+    }
+
+    public void VisitVarAssignList(VarAssignListNode vass)
+    {
+        foreach (var x in vass.lst)
+            x.VisitP(this);
     }
 
     public virtual void VisitIf(IfNode ifn)

@@ -35,7 +35,17 @@ public class FormatCodeVisitor : IVisitor<string>
     public string VisitDouble(DoubleNode d) => d.Val.ToString().Replace(',','.');
     public string VisitId(IdNode id) => id.Name;
 
-    public string VisitAssign(AssignNode ass) => Ind()+ (ass.HasVar?"var ":"")+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
+    public string VisitAssign(AssignNode ass) => Ind()+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
+    public string VisitVarAssign(VarAssignNode ass)  => Ind()+ "var "+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
+
+    public string VisitVarAssignList(VarAssignListNode vass)
+    {
+        string result = Ind();
+        var statements = vass.lst.Select(x => x.Visit(this)).ToList();
+        result += string.Join("\n", statements);
+        return result;
+    }
+
     public string VisitAssignOp(AssignOpNode ass) => ass.ToString();
 
     public string VisitIf(IfNode ifn)
@@ -55,20 +65,19 @@ public class FormatCodeVisitor : IVisitor<string>
         Ind() + "for (" + forNode.Counter.ToString() + "; " + 
         forNode.Condition.ToString() + "; " + forNode.Increment.ToString() + 
         ") do\n" + IndInc() + VisitNode(forNode.Stat) + IndDec();
-   
+    
     public string VisitStatementList(StatementListNode stl)
     {
-        string result = Ind() + "{\n" + IndInc();
+        string result = "";//Ind() + "{\n" + IndInc();
         var statements = stl.lst.Select(x => x.Visit(this)).ToList();
         result += string.Join(";\n", statements);
-        result += IndDec() + "\n" + Ind() + "}";
+        //result += IndDec() + "\n" + Ind() + "}";
         return result;
     }
 
     public string VisitBlockNode(BlockNode bin)
     {
-       return bin.lst.Visit(this);
-        
+       return Ind() + "{\n" + IndInc()+ bin.lst.Visit(this)+IndDec() + "\n" + Ind() + "}";
     }
 
     public string VisitExprList(ExprListNode exlist) =>
@@ -108,7 +117,7 @@ public class FormatCodeVisitor : IVisitor<string>
 
     public string VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
     {
-        return fdandStmts.FuncDefList.Visit(this)+'\n'+
+        return fdandStmts.GlobalVariablesList.Visit(this)+'\n'+ fdandStmts.FuncDefList.Visit(this)+'\n'+
         fdandStmts.StatementList.Visit(this);
     }
 }

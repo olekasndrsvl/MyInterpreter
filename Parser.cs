@@ -70,12 +70,13 @@ public abstract class ParserBase<TokenType>
 
 // Новая грамматика:
 // Program := FuncDefAndStatements
-// FuncDefAndStatements := FunDefList StatementList | StatementList | FunDefList | E
+// FuncDefAndStatements := (VarAssignList | E) ( FunDefList StatementList | StatementList | FunDefList | E)
 // FunDefList := FuncDef+
 // StatementList := Statement (';' Statement)*
 // Statement := Assign | ProcCall | IfStatement | WhileStatement | ForStatement | BlockStatement | ReturnStatement
 // FuncDef := def Id '(' IdList ')' Statement
-// Assign := (var| E) Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
+// Assign := Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
+// VarAssign := var Id = Expr
 // ProcCall := Id '(' ExprList ')
 // FuncCall := Id '(' ExprList ')
 // WhileStatement := while Expr do Statement
@@ -101,19 +102,21 @@ public class Parser : ParserBase<TokenType>
     public FuncDefAndStatements MainProgram()
     {
         var pos = CurrentToken().Pos;
+
+        var globalVarList = GlobalVarList(); 
         
         // Parse function definitions using FuncDefList
         var funcDefList = FuncDefList();
 
         // Parse main statements
-        var statementList = new StatementListNode();
+        var statementList = new StatementNode();
         if (!IsAtEnd() && !At(TokenType.Eof))
         {
-            statementList = StatementList();
+            statementList = BlockStatement();
         }
 
         Requires(TokenType.Eof);
-        return new FuncDefAndStatements(funcDefList, statementList, new Position(lex.GetLineNumber(), pos));
+        return new FuncDefAndStatements(globalVarList,funcDefList, statementList, new Position(lex.GetLineNumber(), pos));
     }
 
     // Отдельная функция для разбора списка определений функций
@@ -149,7 +152,7 @@ public class Parser : ParserBase<TokenType>
     {
         var stl = new StatementListNode();
         
-        if (!At(TokenType.RBrace) && !IsAtEnd())
+        if (!At(TokenType.RBrace))
         {
             stl.Add(Statement());
         }
@@ -184,7 +187,7 @@ public class Parser : ParserBase<TokenType>
 
             if (At(TokenType.Assign) || At(TokenType.AssignPlus) || At(TokenType.AssignMinus) || 
                 At(TokenType.AssignMult) || At(TokenType.AssignDiv))
-                return ParseAssignment(id, false, pos);
+                return ParseAssignment(id, pos);
             else if (At(TokenType.LPar))
                 return ParseProcedureCall(id, pos);
             else
@@ -197,12 +200,12 @@ public class Parser : ParserBase<TokenType>
         return null;
     }
 
-    private StatementNode ParseAssignment(IdNode id, bool hasVar, int pos)
+    private StatementNode ParseAssignment(IdNode id, int pos)
     {
         if (IsMatch(TokenType.Assign))
         {
             var ex = Expr();
-            return new AssignNode(id, ex, hasVar, new Position(lex.GetLineNumber(), pos));
+            return new AssignNode(id, ex, new Position(lex.GetLineNumber(), pos));
         }
         else if (IsMatch(TokenType.AssignPlus))
         {
@@ -232,13 +235,31 @@ public class Parser : ParserBase<TokenType>
         }
     }
 
-    private StatementNode VariableDeclaration()
+    private VarAssignListNode GlobalVarList()
+    {
+        var vass = new VarAssignListNode();
+        while (At(TokenType.tkVar))
+        {
+            vass.Add(VariableDeclaration());
+        }
+        return vass;
+    }
+    private VarAssignNode VariableDeclaration()
     {
         var pos = CurrentToken().Pos;
         Requires(TokenType.tkVar);
         var id = Ident();
-        return ParseAssignment(id, true, pos);
-    
+        if (IsMatch(TokenType.Assign))
+        {
+            var ex = Expr();
+            return new VarAssignNode(id, ex, new Position(lex.GetLineNumber(), pos));
+        }
+        else
+        {
+            ExpectedError(TokenType.Assign);
+        }
+
+        return null;
     }
     private StatementNode ParseProcedureCall(IdNode id, int pos)
     {
@@ -321,7 +342,7 @@ public class Parser : ParserBase<TokenType>
         var stl = StatementList();
         Requires(TokenType.RBrace);
         
-        return stl;
+        return new BlockNode(stl);
     }
 
     

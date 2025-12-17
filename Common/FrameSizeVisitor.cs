@@ -1,5 +1,5 @@
 ﻿using MyInterpreter.SemanticCheck;
-using static MyInterpreter.SemanticCheck.SymbolTable;
+
 
 namespace MyInterpreter.Common;
 
@@ -10,15 +10,15 @@ public class FrameSizeVisitor : IVisitorP
     private Stack<FunctionSpecialization> _specializationStack = new Stack<FunctionSpecialization>();
     private Stack<string> _functionStack = new Stack<string>();
     private List<string> _alreadyGeneratedFunctions = new List<string>();
+    private NameSpace _currentNameSpace;
     
     public FrameSizeVisitor()
     {
         _functionStack.Push("MainFrame");
-        _specializationStack.Push(SymbolTable.FunctionTable["Main"].Specializations.First());
+        _specializationStack.Push(SymbolTree.FunctionTable["Main"].Specializations.First());
         
         // Начальное количество временных = количество локальных переменных Main
-        int initialTemps = SymbolTable.FunctionTable["Main"].Specializations.First()
-            .LocalVariableTypes.Count(x => x.Value.Kind == KindType.VarName);
+        int initialTemps = SymbolTree.FunctionTable["Main"].Specializations.First().NameSpace.Variables.Count(x => x.Value.Kind == KindType.VarName);
         
         _tempCounters.Add("MainFrame", initialTemps);
         _frameSizes.Add("MainFrame", initialTemps);
@@ -55,8 +55,8 @@ public class FrameSizeVisitor : IVisitorP
         bin.Right.VisitP(this);
         int rightTemp = _tempCounters[_functionStack.Peek()] - 1;
         
-        var leftType = TypeChecker.CalcType(bin.Left, _specializationStack.Peek());
-        var rightType = TypeChecker.CalcType(bin.Right, _specializationStack.Peek());
+        var leftType = TypeChecker.CalcType(bin.Left, _currentNameSpace);
+        var rightType = TypeChecker.CalcType(bin.Right, _currentNameSpace);
         
         // Конвертация типов если нужно
         if (leftType == SemanticType.IntType && rightType == SemanticType.DoubleType)
@@ -115,9 +115,9 @@ public class FrameSizeVisitor : IVisitorP
         {
             return;
         }
-        var varType = TypeChecker.CalcType(ass.Ident, _specializationStack.Peek());
+        var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
         ass.Expr.VisitP(this);
-        var exprType = TypeChecker.CalcType(ass.Expr, _specializationStack.Peek());
+        var exprType = TypeChecker.CalcType(ass.Expr, _currentNameSpace);
         
         if (exprType == SemanticType.IntType && varType == SemanticType.DoubleType)
             NewTemp();
@@ -128,9 +128,9 @@ public class FrameSizeVisitor : IVisitorP
         NewTemp(); // currentValueTemp
         ass.Expr.VisitP(this);
         
-        var varType = TypeChecker.CalcType(ass.Ident, _specializationStack.Peek());
+        var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
         SemanticType exprType;
-        exprType = TypeChecker.CalcType(ass.Expr, _specializationStack.Peek());
+        exprType = TypeChecker.CalcType(ass.Expr, _currentNameSpace);
 
         if (varType == SemanticType.DoubleType && exprType == SemanticType.IntType)
         {
@@ -139,7 +139,18 @@ public class FrameSizeVisitor : IVisitorP
         
         NewTemp(); // operationResultTemp
     }
-    
+
+    public void VisitVarAssign(VarAssignNode ass)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void VisitVarAssignList(VarAssignListNode vass)
+    {
+        foreach (var x in vass.lst)
+            x.VisitP(this);
+    }
+
     public void VisitIf(IfNode ifn)
     {
         ifn.Condition.VisitP(this);
@@ -191,14 +202,14 @@ public class FrameSizeVisitor : IVisitorP
             _functionStack.Push(funcFullName);
             
             // Инициализируем счетчик
-            var specialization = SymbolTable.FunctionTable[f.Name.Name].Specializations
+            var specialization = SymbolTree.FunctionTable[f.Name.Name].Specializations
                 .Find(x => x.SpecializationId == f.SpecializationId);
-            _tempCounters[funcFullName] = specialization.LocalVariableTypes.Count;
+            _tempCounters[funcFullName] = specialization.NameSpace.Variables.Count;
             _frameSizes[funcFullName] = _tempCounters[funcFullName];
             _specializationStack.Push(specialization);
             
             // Генерируем код функции
-            SymbolTable.FunctionTable[f.Name.Name].Definition.VisitP(this);
+            SymbolTree.FunctionTable[f.Name.Name].Definition.VisitP(this);
             
             // Восстанавливаем
             _specializationStack.Pop();
@@ -232,7 +243,7 @@ public class FrameSizeVisitor : IVisitorP
     {
         r.Expr.VisitP(this);
         
-        SemanticType returnType = TypeChecker.CalcType(r.Expr, _specializationStack.Peek());
+        SemanticType returnType = TypeChecker.CalcType(r.Expr, _currentNameSpace);
         SemanticType expectedType = _specializationStack.Peek().ReturnType;
         
         if (returnType == SemanticType.IntType && expectedType == SemanticType.DoubleType)

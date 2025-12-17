@@ -15,6 +15,8 @@ public interface IVisitor<T>
     T VisitDouble(DoubleNode d);
     T VisitId(IdNode id);
     T VisitAssign(AssignNode ass);
+    T VisitVarAssign(VarAssignNode ass);
+    T VisitVarAssignList(VarAssignListNode vass);
     T VisitAssignOp(AssignOpNode ass);
     T VisitIf(IfNode ifn);
     T VisitWhile(WhileNode whn);
@@ -41,6 +43,8 @@ public interface IVisitorP
     void VisitId(IdNode id);
     void VisitAssign(AssignNode ass);
     void VisitAssignOp(AssignOpNode ass);
+    void VisitVarAssign(VarAssignNode ass);
+    void VisitVarAssignList(VarAssignListNode vass);
     void VisitIf(IfNode ifn);
     void VisitWhile(WhileNode whn);
     void VisitFor(ForNode forNode);
@@ -196,16 +200,45 @@ public class IdNode : ExprNode
     public override void VisitP(IVisitorP v) => v.VisitId(this);
 }
 
+public class VarAssignNode : StatementNode
+{
+    public IdNode Ident { get; set; }
+    public ExprNode Expr { get; set; }
+    
+    public VarAssignNode(IdNode Ident = null, ExprNode Expr = null, Position p = null)
+    {
+        this.Ident = Ident;
+        this.Expr = Expr;
+        Pos = p;
+    }
+    
+    public override string ToString()
+    {
+        var exstr = Expr.ToString();
+        return $"var {Ident} = {exstr}";
+    }
+    
+    public override T Visit<T>(IVisitor<T> v) => v.VisitVarAssign(this);
+    public override void VisitP(IVisitorP v) => v.VisitVarAssign(this);
+}
+
+public class VarAssignListNode : VarAssignNode
+{
+    public List<VarAssignNode> lst = new List<VarAssignNode>();
+    
+    public void Add(VarAssignNode ass) => lst.Add(ass);
+    public override string ToString() => string.Join(",", lst);
+    
+    public override T Visit<T>(IVisitor<T> v) => v.VisitVarAssignList(this);
+    public override void VisitP(IVisitorP v) => v.VisitVarAssignList(this);
+}
 public class AssignNode : StatementNode
 {
     public IdNode Ident { get; set; }
     public ExprNode Expr { get; set; }
-    public bool HasVar { get; set; }
-    
-    public AssignNode(IdNode Ident, ExprNode Expr, bool hasvar =false, Position p = null)
+    public AssignNode(IdNode Ident, ExprNode Expr, Position p = null)
     {
         this.Ident = Ident;
-        HasVar = hasvar;
         this.Expr = Expr;
         Pos = p;
     }
@@ -245,12 +278,11 @@ public class AssignOpNode : StatementNode
 }
 
 
-public class BlockNode : StatementNode
+public class BlockNode(StatementListNode stl) : StatementNode
 {
-    public StatementListNode lst;
-    
-    // place for link in symbol table
-    
+    public StatementListNode lst = stl;
+
+    public NameSpace BlockNameSpace;
     public void Add(StatementNode st) => lst.Add(st);
     public override string ToString() => string.Join("; ", lst);
     
@@ -262,8 +294,9 @@ public class IfNode : StatementNode
 {
     public ExprNode Condition { get; set; }
     public StatementNode ThenStat { get; set; }
+    public LightWeightNameSpace TheNameSpaceSpace;
     public StatementNode ElseStat { get; set; }
-    
+    public LightWeightNameSpace ElseNameSpace;
     public IfNode(ExprNode Condition, StatementNode ThenStat, StatementNode ElseStat, Position p = null)
     {
         this.Condition = Condition;
@@ -288,6 +321,7 @@ public class WhileNode : StatementNode
 {
     public ExprNode Condition { get; set; }
     public StatementNode Stat { get; set; }
+    public LightWeightNameSpace WhileNameSpace;
     
     public WhileNode(ExprNode Condition, StatementNode Stat, Position p = null)
     {
@@ -303,7 +337,7 @@ public class ForNode : StatementNode
 {
     public AssignNode Counter { get; set; }
     public ExprNode Condition { get; set; }
-    
+    public LightWeightNameSpace ForNameSpace;
     public AssignOpNode Increment { get; set; }
     public StatementNode Stat { get; set; }
     
@@ -339,13 +373,15 @@ public class ProcCallNode : StatementNode
 
 public class FuncDefAndStatements : Node
 {
+    public VarAssignListNode GlobalVariablesList { get; set; }
     public StatementNode StatementList { get; set; }
     public FuncDefNode FuncDefList { get; set; }
 
-    public FuncDefAndStatements(FuncDefNode funcDefList,StatementNode statementList,  Position p = null)
+    public FuncDefAndStatements(VarAssignListNode vass, FuncDefNode funcDefList,StatementNode statementList,  Position p = null)
     {
         this.StatementList = statementList;
         this.FuncDefList = funcDefList;
+        GlobalVariablesList = vass;
         Pos = p;
     }
     public override T Visit<T>(IVisitor<T> v) => v.VisitFunDefAndStatements(this);

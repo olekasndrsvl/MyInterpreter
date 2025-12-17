@@ -2,7 +2,7 @@
 using MyInterpreter.SemanticCheck;
 
 namespace MyInterpreter;
-using static SymbolTable;
+using static SymbolTree;
 
 public static class TypeChecker
 {
@@ -18,13 +18,13 @@ public static class TypeChecker
             return false;
     }
     
-    public static SemanticType CalcTypeVis(ExprNode ex, FunctionSpecialization context)
+    public static SemanticType CalcTypeVis(ExprNode ex, NameSpace context)
     { 
         return ex.Visit(new CalcTypeVisitor(context));
     }
 
     // Альтернативная реализация без визитора с использованием pattern matching
-    public static SemanticType CalcType(ExprNode ex, FunctionSpecialization context)
+    public static SemanticType CalcType(ExprNode ex, NameSpace context)
     {
         switch (ex)
         {
@@ -32,8 +32,8 @@ public static class TypeChecker
                 return CalcTypeVis(funccall, context);
             
             case IdNode id:
-                if (context.LocalVariableTypes.ContainsKey(id.Name))
-                    return context.LocalVariableTypes[id.Name].Type;
+                if (context.LookupVariable(id.Name)!= null)
+                    return context.LookupVariable(id.Name).Type;
                 else
                     return SemanticType.BadType;
         
@@ -100,9 +100,9 @@ public static class TypeChecker
 
 public class CalcTypeVisitor : IVisitor<SemanticType>
 {
-    private readonly FunctionSpecialization _context;
+    private readonly NameSpace _context;
 
-    public CalcTypeVisitor(FunctionSpecialization context)
+    public CalcTypeVisitor(NameSpace context)
     {
         _context = context;
     }
@@ -161,15 +161,18 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     
     public SemanticType VisitId(IdNode id)
     {
-        if (!_context.LocalVariableTypes.ContainsKey(id.Name))
+        var variable = _context.LookupVariable(id.Name);
+        if (variable == null)
              CompilerExceptions.SemanticError("Идентификатор " + id.Name + " не определен", id.Pos);
         else 
-            return _context.LocalVariableTypes[id.Name].Type;
+            return variable.Type;
         
         return SemanticType.BadType;
     }
     
     public SemanticType VisitAssign(AssignNode ass) => SemanticType.NoType;
+    public SemanticType VisitVarAssign(VarAssignNode ass)  => SemanticType.NoType;
+    public SemanticType VisitVarAssignList(VarAssignListNode vass) => SemanticType.NoType;
     
     public SemanticType VisitAssignOp(AssignOpNode ass) => SemanticType.NoType;
     
