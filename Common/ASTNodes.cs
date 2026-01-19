@@ -5,6 +5,7 @@ namespace MyInterpreter;
 public interface IVisitor<T>
 {
     T VisitNode(Node bin);
+    T VisitDefinitionNode(DefinitionNode def);
     T VisitExprNode(ExprNode bin);
     T VisitStatementNode(StatementNode bin);
     T VisitBinOp(BinOpNode bin);
@@ -16,7 +17,6 @@ public interface IVisitor<T>
     T VisitId(IdNode id);
     T VisitAssign(AssignNode ass);
     T VisitVarAssign(VarAssignNode ass);
-    T VisitVarAssignList(VarAssignListNode vass);
     T VisitAssignOp(AssignOpNode ass);
     T VisitIf(IfNode ifn);
     T VisitWhile(WhileNode whn);
@@ -24,14 +24,16 @@ public interface IVisitor<T>
     T VisitProcCall(ProcCallNode p);
     T VisitFuncCall(FuncCallNode f);
     T VisitFuncDef(FuncDefNode f);
-    T VisitFuncDefList(FuncDefListNode lst);
     T VisitReturn(ReturnNode r);
-    T VisitFunDefAndStatements(FuncDefAndStatements fdandStmts);
+    T VisitDefinitionsAndStatements(DefinitionsAndStatements fdandStmts);
+    T VisitVariableDeclarationNode(VariableDeclarationNode varDecl);
+    T VisitDefinitionsList(DefinitionsListNode defList);
 }
 
 public interface IVisitorP
 {
     void VisitNode(Node bin);
+    void VisitDefinitionNode(DefinitionNode defNode);
     void VisitExprNode(ExprNode bin);
     void VisitStatementNode(StatementNode bin);
     void VisitBinOp(BinOpNode bin);
@@ -44,15 +46,15 @@ public interface IVisitorP
     void VisitAssign(AssignNode ass);
     void VisitAssignOp(AssignOpNode ass);
     void VisitVarAssign(VarAssignNode ass);
-    void VisitVarAssignList(VarAssignListNode vass);
     void VisitIf(IfNode ifn);
     void VisitWhile(WhileNode whn);
     void VisitFor(ForNode forNode);
     void VisitProcCall(ProcCallNode p);
     void VisitFuncCall(FuncCallNode f);
     void VisitFuncDef(FuncDefNode f);
-    void VisitFuncDefList(FuncDefListNode lst);
-    void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts);
+    void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts);
+    void VisitDefinitionsList(DefinitionsListNode defList);
+    void VisitVariableDeclarationNode(VariableDeclarationNode vardecl);
     void VisitReturn(ReturnNode r);
 }
 
@@ -62,6 +64,12 @@ public class Node
     
     public virtual T Visit<T>(IVisitor<T> v) => v.VisitNode(this);
     public virtual void VisitP(IVisitorP v) => v.VisitNode(this);
+}
+
+public class DefinitionNode : Node
+{
+    public virtual T Visit<T>(IVisitor<T> v) => v.VisitDefinitionNode(this);
+    public virtual void VisitP(IVisitorP v) => v.VisitDefinitionNode(this);
 }
 
 public class ExprNode : Node
@@ -128,15 +136,6 @@ public class StatementListNode : StatementNode
     public override void VisitP(IVisitorP v) => v.VisitStatementList(this);
 }
 
-public class FuncDefListNode : FuncDefNode
-{
-    public List<FuncDefNode> lst = new List<FuncDefNode>();
-    public void Add(FuncDefNode f) => lst.Add(f);
-    public override string ToString() => string.Join(";", lst);
-    public override T Visit<T>(IVisitor<T> v) => v.VisitFuncDefList(this);
-    public override void VisitP(IVisitorP v) => v.VisitFuncDefList(this);
-   
-}
 
 public class ExprListNode : Node
 {
@@ -200,6 +199,19 @@ public class IdNode : ExprNode
     public override void VisitP(IVisitorP v) => v.VisitId(this);
 }
 
+public class VariableDeclarationNode : DefinitionNode
+{
+    public VarAssignNode vass;
+
+    public VariableDeclarationNode(VarAssignNode vass, Position p = null)
+    {
+        this.vass = vass;
+        Pos = p;
+    }
+    public override T Visit<T>(IVisitor<T> v) => v.VisitVariableDeclarationNode(this);
+    public override void VisitP(IVisitorP v) => v.VisitVariableDeclarationNode(this);
+}
+
 public class VarAssignNode : StatementNode
 {
     public IdNode Ident { get; set; }
@@ -222,16 +234,6 @@ public class VarAssignNode : StatementNode
     public override void VisitP(IVisitorP v) => v.VisitVarAssign(this);
 }
 
-public class VarAssignListNode : VarAssignNode
-{
-    public List<VarAssignNode> lst = new List<VarAssignNode>();
-    
-    public void Add(VarAssignNode ass) => lst.Add(ass);
-    public override string ToString() => string.Join(",", lst);
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitVarAssignList(this);
-    public override void VisitP(IVisitorP v) => v.VisitVarAssignList(this);
-}
 public class AssignNode : StatementNode
 {
     public IdNode Ident { get; set; }
@@ -371,24 +373,31 @@ public class ProcCallNode : StatementNode
     public override void VisitP(IVisitorP v) => v.VisitProcCall(this);
 }
 
-public class FuncDefAndStatements : Node
+public class DefinitionsListNode : DefinitionNode
 {
-    public VarAssignListNode GlobalVariablesList { get; set; }
-    public StatementNode StatementList { get; set; }
-    public FuncDefNode FuncDefList { get; set; }
+    public List<DefinitionNode> lst = new List<DefinitionNode>();
+    public void Add(DefinitionNode def) => lst.Add(def);
+    public override string ToString() => string.Join(";\n", lst);
+    public override T Visit<T>(IVisitor<T> v) => v.VisitDefinitionsList(this);
+    public override void VisitP(IVisitorP v) => v.VisitDefinitionsList(this);
 
-    public FuncDefAndStatements(VarAssignListNode vass, FuncDefNode funcDefList,StatementNode statementList,  Position p = null)
+}
+public class DefinitionsAndStatements : Node
+{
+    public StatementNode MainProgram { get; set; }
+    public DefinitionsListNode DefinitionsList { get; set; }
+
+    public DefinitionsAndStatements(DefinitionsListNode DefList,StatementNode statementList,  Position p = null)
     {
-        this.StatementList = statementList;
-        this.FuncDefList = funcDefList;
-        GlobalVariablesList = vass;
+        this.MainProgram = statementList;
+        this.DefinitionsList = DefList;
         Pos = p;
     }
-    public override T Visit<T>(IVisitor<T> v) => v.VisitFunDefAndStatements(this);
-    public override void VisitP(IVisitorP v) => v.VisitFunDefAndStatements(this);
+    public override T Visit<T>(IVisitor<T> v) => v.VisitDefinitionsAndStatements(this);
+    public override void VisitP(IVisitorP v) => v.VisitDefinitionsAndStatements(this);
 }
 
-public class FuncDefNode :Node
+public class FuncDefNode: DefinitionNode
 {
     public IdNode Name { get; set; }
     public List<IdNode> Params { get; set; }

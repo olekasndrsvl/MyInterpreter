@@ -42,6 +42,11 @@ public class FrameSizeVisitor : IVisitorP
     }
     
     public void VisitNode(Node node) { }
+    public void VisitDefinitionNode(DefinitionNode defNode)
+    {
+        throw new NotImplementedException();
+    }
+
     public void VisitExprNode(ExprNode node) { }
     public void VisitStatementNode(StatementNode node) { }
     
@@ -145,12 +150,7 @@ public class FrameSizeVisitor : IVisitorP
         throw new NotImplementedException();
     }
 
-    public void VisitVarAssignList(VarAssignListNode vass)
-    {
-        foreach (var x in vass.lst)
-            x.VisitP(this);
-    }
-
+  
     public void VisitIf(IfNode ifn)
     {
         ifn.Condition.VisitP(this);
@@ -225,20 +225,25 @@ public class FrameSizeVisitor : IVisitorP
         // Метка функции уже добавлена где-то выше
         f.Body.VisitP(this);
     }
-    
-    public void VisitFuncDefList(FuncDefListNode lst)
+
+    public void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
     {
-        foreach (var funcDef in lst.lst)
+        DefandStmts.DefinitionsList.VisitP(this);
+        DefandStmts.MainProgram.VisitP(this);
+    }
+
+    public void VisitDefinitionsList(DefinitionsListNode defList)
+    { foreach (var def in defList.lst)
         {
-            funcDef.VisitP(this);
-        }
+            def.VisitP(this);
+        }   
     }
-    
-    public void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
+
+    public void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)
     {
-        fdandStmts.StatementList.VisitP(this);
+        
     }
-    
+
     public void VisitReturn(ReturnNode r)
     {
         r.Expr.VisitP(this);

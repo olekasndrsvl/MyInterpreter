@@ -148,6 +148,11 @@ public class ThreeAddressCodeVisitor : IVisitorP
     }
 
     public void VisitNode(Node node) { }
+    public void VisitDefinitionNode(DefinitionNode defNode)
+    {
+        throw new NotImplementedException();
+    }
+
     public void VisitExprNode(ExprNode node) { }
     public void VisitStatementNode(StatementNode node) { }
 
@@ -473,12 +478,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         throw new NotImplementedException();
     }
 
-    public void VisitVarAssignList(VarAssignListNode vass)
-    {
-        foreach (var x in vass.lst)
-            x.VisitP(this);
-    }
-
+  
     public void VisitIf(IfNode ifn)
     {
         string elseLabel = NewLabel();
@@ -719,19 +719,25 @@ public class ThreeAddressCodeVisitor : IVisitorP
         _alreadyGeneratedFunctionDefinitions.Add(_currentGeneratingFunctionName.Pop());
     }
 
-    public void VisitFuncDefList(FuncDefListNode lst)
+    public void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
     {
-        foreach (var VARIABLE in lst.lst) 
+        DefandStmts.DefinitionsList.VisitP(this);
+        DefandStmts.MainProgram.VisitP(this);
+    }
+
+    public void VisitDefinitionsList(DefinitionsListNode defList)
+    {
+        foreach (var x in defList.lst) 
         {
-            VARIABLE.VisitP(this);
+            x.VisitP(this);
         }
     }
 
-    public void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
+    public void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)
     {
-       // fdandStmts.FuncDefList.VisitP(this);
-        fdandStmts.StatementList.VisitP(this);
+        throw new NotImplementedException();
     }
+    
 
     public void VisitReturn(ReturnNode r)
     {

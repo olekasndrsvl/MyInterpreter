@@ -110,7 +110,11 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     public SemanticType CalcTypeVis(ExprNode ex) => ex.Visit(this);
     
     public SemanticType VisitNode(Node bin) => SemanticType.NoType;
-    
+    public SemanticType VisitDefinitionNode(DefinitionNode def)
+    {
+        throw new NotImplementedException();
+    }
+
     public SemanticType VisitExprNode(ExprNode bin) => SemanticType.NoType;
     
     public SemanticType VisitStatementNode(StatementNode bin) => SemanticType.NoType;
@@ -172,8 +176,6 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     
     public SemanticType VisitAssign(AssignNode ass) => SemanticType.NoType;
     public SemanticType VisitVarAssign(VarAssignNode ass)  => SemanticType.NoType;
-    public SemanticType VisitVarAssignList(VarAssignListNode vass) => SemanticType.NoType;
-    
     public SemanticType VisitAssignOp(AssignOpNode ass) => SemanticType.NoType;
     
     public SemanticType VisitIf(IfNode ifn) => SemanticType.NoType;
@@ -305,6 +307,11 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
 
     public SemanticType VisitFuncDef(FuncDefNode f) => SemanticType.NoType;
     public SemanticType VisitReturn(ReturnNode r) => SemanticType.NoType;
-    public SemanticType VisitFuncDefList(FuncDefListNode lst) => SemanticType.NoType;
-    public SemanticType VisitFunDefAndStatements(FuncDefAndStatements fdandStmts) => SemanticType.NoType;
+    public SemanticType VisitDefinitionsAndStatements(DefinitionsAndStatements fdandStmts) => SemanticType.NoType;
+
+    public SemanticType VisitVariableDeclarationNode(VariableDeclarationNode varDecl) => SemanticType.NoType;
+
+    public SemanticType VisitDefinitionsList(DefinitionsListNode defList) => SemanticType.NoType;
+
+
 }

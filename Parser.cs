@@ -69,8 +69,10 @@ public abstract class ParserBase<TokenType>
 }
 
 // Новая грамматика:
-// Program := FuncDefAndStatements
-// FuncDefAndStatements := (VarAssignList | E) ( FunDefList StatementList | StatementList | FunDefList | E)
+// Program := DefinitionsAndStatements
+// DefinitionsAndStatements := (DefinitionsList MainProgram | MainProgram | E)
+// DefinitionsList := Definition (';', Definition)*
+// MainProgram := BlockStatement
 // FunDefList := FuncDef+
 // StatementList := Statement (';' Statement)*
 // Statement := Assign | ProcCall | IfStatement | WhileStatement | ForStatement | BlockStatement | ReturnStatement
@@ -99,38 +101,44 @@ public class Parser : ParserBase<TokenType>
 {
     public Parser(ILexer<TokenType> lex) : base(lex) { }
 
-    public FuncDefAndStatements MainProgram()
+    public DefinitionsAndStatements MainProgram()
     {
         var pos = CurrentToken().Pos;
-
-        var globalVarList = GlobalVarList(); 
-        
-        // Parse function definitions using FuncDefList
-        var funcDefList = FuncDefList();
-
-        // Parse main statements
-        var statementList = new StatementNode();
-        if (!IsAtEnd() && !At(TokenType.Eof))
+        DefinitionsListNode defList = new DefinitionsListNode();
+        StatementNode mainProg;
+    
+        // Вариант 1: Есть определения, затем основной блок
+        if (At(TokenType.tkDef) || At(TokenType.tkVar))
         {
-            statementList = BlockStatement();
+            defList = DefinitionList();
+        
+            // После определений должен быть основной блок
+            if (At(TokenType.LBrace))
+            {
+                mainProg = BlockStatement();
+            }
+            else
+            {
+                // Если нет основного блока, создаем пустой
+                mainProg = new BlockNode(new StatementListNode());
+            }
         }
-
+        // Вариант 2: Только основной блок (начинается с {)
+        else if (At(TokenType.LBrace))
+        {
+            mainProg = BlockStatement();
+        }
+        // Вариант 3: Пустая программа
+        else
+        {
+            mainProg = new BlockNode(new StatementListNode());
+        }
+    
         Requires(TokenType.Eof);
-        return new FuncDefAndStatements(globalVarList,funcDefList, statementList, new Position(lex.GetLineNumber(), pos));
+        return new DefinitionsAndStatements(defList, mainProg, new Position(lex.GetLineNumber(), pos));
     }
 
-    // Отдельная функция для разбора списка определений функций
-    public FuncDefListNode FuncDefList()
-    {
-        var funcDefList = new FuncDefListNode();
-        
-        while (At(TokenType.tkDef))
-        {
-            funcDefList.Add(FuncDef());
-        }
-        
-        return funcDefList;
-    }
+    
 
     public FuncDefNode FuncDef()
     {
@@ -148,6 +156,40 @@ public class Parser : ParserBase<TokenType>
         return new FuncDefNode(name, parameters, body, new Position(lex.GetLineNumber(), pos));
     }
 
+    public DefinitionsListNode DefinitionList()
+    {
+        var dlst = new DefinitionsListNode();
+    
+        // Парсим первое определение
+        if (At(TokenType.tkDef) || At(TokenType.tkVar))
+        {
+            dlst.Add(Definition());
+        
+            // Парсим остальные определения, разделенные точкой с запятой
+            while (IsMatch(TokenType.Semicolon))
+            {
+                // Если после точки с запятой нет определений, выходим
+                if (!At(TokenType.tkDef) && !At(TokenType.tkVar))
+                    break;
+                
+                dlst.Add(Definition());
+            }
+        }
+    
+        return dlst;
+    }
+    
+    public DefinitionNode Definition()
+    {
+        if (At(TokenType.tkDef))
+            return FuncDef();
+        else if (At(TokenType.tkVar))
+            return GlobalVariableDeclaration();
+        ExpectedError(TokenType.tkDef, TokenType.tkVar);
+        return null;
+    }
+
+    
     public StatementListNode StatementList()
     {
         var stl = new StatementListNode();
@@ -165,7 +207,6 @@ public class Parser : ParserBase<TokenType>
         
         return stl;
     }
-
     public StatementNode Statement()
     {
         if (At(TokenType.tkIf))
@@ -235,15 +276,7 @@ public class Parser : ParserBase<TokenType>
         }
     }
 
-    private VarAssignListNode GlobalVarList()
-    {
-        var vass = new VarAssignListNode();
-        while (At(TokenType.tkVar))
-        {
-            vass.Add(VariableDeclaration());
-        }
-        return vass;
-    }
+  
     private VarAssignNode VariableDeclaration()
     {
         var pos = CurrentToken().Pos;
@@ -259,6 +292,23 @@ public class Parser : ParserBase<TokenType>
             ExpectedError(TokenType.Assign);
         }
 
+        return null;
+    }
+
+    private VariableDeclarationNode GlobalVariableDeclaration()
+    {
+        var pos = CurrentToken().Pos;
+        Requires(TokenType.tkVar);
+        var id = Ident();
+        if (IsMatch(TokenType.Assign))
+        {
+            var ex = Expr();
+            return new VariableDeclarationNode(new VarAssignNode(id, ex, new Position(lex.GetLineNumber(), pos)));
+        }
+        else
+        {
+            ExpectedError(TokenType.Assign);
+        }
         return null;
     }
     private StatementNode ParseProcedureCall(IdNode id, int pos)

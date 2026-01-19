@@ -3,6 +3,7 @@
 public class AutoVisitor : IVisitorP
 {
     public virtual void VisitNode(Node n) { }
+    public void VisitDefinitionNode(DefinitionNode defNode) {}
     public virtual void VisitExprNode(ExprNode n) { }
     public virtual void VisitStatementNode(StatementNode n) { }
     public virtual void VisitInt(IntNode n) { }
@@ -50,11 +51,7 @@ public class AutoVisitor : IVisitorP
         ass.Expr.VisitP(this);
     }
 
-    public void VisitVarAssignList(VarAssignListNode vass)
-    {
-        foreach (var x in vass.lst)
-            x.VisitP(this);
-    }
+
 
     public virtual void VisitIf(IfNode ifn)
     {
@@ -99,18 +96,23 @@ public class AutoVisitor : IVisitorP
         
     }
 
-    public void VisitFuncDefList(FuncDefListNode lst)
+    public void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
     {
-        foreach (var VARIABLE in lst.lst)
+        DefandStmts.DefinitionsList.VisitP(this);
+        DefandStmts.MainProgram.VisitP(this);
+    }
+
+    public void VisitDefinitionsList(DefinitionsListNode defList)
+    {
+        foreach (var x in defList.lst)
         {
-            VARIABLE.VisitP(this);
+           x.VisitP(this);
         }
     }
 
-    public void VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
+    public void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)
     {
-       fdandStmts.FuncDefList.VisitP(this);
-       fdandStmts.StatementList.VisitP(this);
+        vardecl.vass.VisitP(this);
     }
 
     public virtual void VisitReturn(ReturnNode r)

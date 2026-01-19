@@ -1,125 +1,352 @@
 ﻿using System.Text;
-using System.Text;
 
 namespace MyInterpreter;
 
 public class FormatCodeVisitor : IVisitor<string>
 {
-    private int ident = 0;
+    private int _indentLevel = 0;
+    private bool _inStatementList = false;
     
-    private string Ind()
+    private string Indent()
     {
-        return new string(' ', ident);
+        return new string(' ', _indentLevel);
     }
 
-    private string IndInc()
+    private string IndentInc()
     {
-        ident += 2;
+        _indentLevel += 2;
         return "";
     }
     
-    private string IndDec()
+    private string IndentDec()
     {
-        ident -= 2;
+        _indentLevel -= 2;
+        if (_indentLevel < 0) _indentLevel = 0;
         return "";
     }
-    
+
     public string VisitNode(Node n) => n.Visit(this);
+    public string VisitDefinitionNode(DefinitionNode def) => def.Visit(this);
     public string VisitExprNode(ExprNode ex) => ex.Visit(this);
-    public string VisitStatementNode(StatementNode st) => Ind() + st.Visit(this);
+    public string VisitStatementNode(StatementNode st) => st.Visit(this);
     
-    public string VisitBinOp(BinOpNode bin) =>
-        VisitNode(bin.Left) + bin.OpToStr() + VisitNode(bin.Right);
+    public string VisitBinOp(BinOpNode bin)
+    {
+        // Добавляем пробелы вокруг оператора для читаемости
+        string left = VisitNode(bin.Left);
+        string op = bin.OpToStr();
+        string right = VisitNode(bin.Right);
+        
+        // Для логических операторов добавляем пробелы
+        if (op == "&&" || op == "||" || op.Length > 1)
+        {
+            return $"{left} {op} {right}";
+        }
+        else
+        {
+            return $"{left}{op}{right}";
+        }
+    }
 
     public string VisitInt(IntNode n) => n.Val.ToString();
-    public string VisitDouble(DoubleNode d) => d.Val.ToString().Replace(',','.');
+    public string VisitDouble(DoubleNode d) => d.Val.ToString(System.Globalization.CultureInfo.InvariantCulture);
     public string VisitId(IdNode id) => id.Name;
 
-    public string VisitAssign(AssignNode ass) => Ind()+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
-    public string VisitVarAssign(VarAssignNode ass)  => Ind()+ "var "+ ass.Ident.Name + " = " + VisitNode(ass.Expr);
-
-    public string VisitVarAssignList(VarAssignListNode vass)
+    public string VisitAssign(AssignNode ass)
     {
-        string result = Ind();
-        var statements = vass.lst.Select(x => x.Visit(this)).ToList();
-        result += string.Join("\n", statements);
-        return result;
+        // Для простого присваивания
+        return $"{ass.Ident.Name} = {VisitNode(ass.Expr)}";
     }
 
-    public string VisitAssignOp(AssignOpNode ass) => ass.ToString();
+    public string VisitVarAssign(VarAssignNode ass)
+    {
+        // Для объявления переменной с присваиванием
+        return $"var {ass.Ident.Name} = {VisitNode(ass.Expr)}";
+    }
+
+    public string VisitAssignOp(AssignOpNode ass)
+    {
+        // Для составных операторов присваивания: +=, -=, *=, /=
+        string op = ass.Op switch
+        {
+            '+' => "+=",
+            '-' => "-=",
+            '*' => "*=",
+            '/' => "/=",
+            _ => "="
+        };
+        return $"{ass.Ident.Name} {op} {VisitNode(ass.Expr)}";
+    }
 
     public string VisitIf(IfNode ifn)
     {
-        string result = Ind() + "if " + VisitNode(ifn.Condition) + " then\n" + 
-                       IndInc() + VisitNode(ifn.ThenStat) + IndDec();
+        string condition = VisitNode(ifn.Condition);
+        string thenBranch = VisitNode(ifn.ThenStat);
+        
+        string result = $"{Indent()}if {condition} then";
+        
+        // Проверяем, является ли then ветка блоком
+        if (ifn.ThenStat is BlockNode)
+        {
+            result += " ";
+        }
+        else
+        {
+            result += "\n" + IndentInc();
+        }
+        
+        result += thenBranch;
+        
+        if (!(ifn.ThenStat is BlockNode))
+        {
+            result += IndentDec();
+        }
+        
+        // Обрабатываем else ветку
         if (ifn.ElseStat != null)
-            result += "\n" + Ind() + "else\n" + IndInc() + VisitNode(ifn.ElseStat) + IndDec();
+        {
+            string elseBranch = VisitNode(ifn.ElseStat);
+            
+            if (ifn.ThenStat is BlockNode)
+            {
+                result += " ";
+            }
+            else
+            {
+                result += "\n" + Indent();
+            }
+            
+            result += "else";
+            
+            if (ifn.ElseStat is BlockNode)
+            {
+                result += " ";
+            }
+            else
+            {
+                result += "\n" + IndentInc();
+            }
+            
+            result += elseBranch;
+            
+            if (!(ifn.ElseStat is BlockNode))
+            {
+                result += IndentDec();
+            }
+        }
+        
         return result;
     }
 
-    public string VisitWhile(WhileNode whn) => 
-        Ind() + "while " + VisitNode(whn.Condition) + " do\n" + 
-        IndInc() + VisitNode(whn.Stat) + IndDec();
+    public string VisitWhile(WhileNode whn)
+    {
+        string condition = VisitNode(whn.Condition);
+        string body = VisitNode(whn.Stat);
+        
+        string result = $"{Indent()}while {condition} do";
+        
+        // Если тело - блок, ставим его на той же строке
+        if (whn.Stat is BlockNode)
+        {
+            result += " ";
+        }
+        else
+        {
+            result += "\n" + IndentInc();
+        }
+        
+        result += body;
+        
+        if (!(whn.Stat is BlockNode))
+        {
+            result += IndentDec();
+        }
+        
+        return result;
+    }
 
-    public string VisitFor(ForNode forNode) => 
-        Ind() + "for (" + forNode.Counter.ToString() + "; " + 
-        forNode.Condition.ToString() + "; " + forNode.Increment.ToString() + 
-        ") do\n" + IndInc() + VisitNode(forNode.Stat) + IndDec();
-    
+    public string VisitFor(ForNode forNode)
+    {
+        string init = forNode.Counter.Visit(this);
+        string condition = forNode.Condition.Visit(this);
+        string increment = forNode.Increment.Visit(this);
+        string body = VisitNode(forNode.Stat);
+        
+        string result = $"{Indent()}for ({init}; {condition}; {increment}) do";
+        
+        // Если тело - блок, ставим его на той же строке
+        if (forNode.Stat is BlockNode)
+        {
+            result += " ";
+        }
+        else
+        {
+            result += "\n" + IndentInc();
+        }
+        
+        result += body;
+        
+        if (!(forNode.Stat is BlockNode))
+        {
+            result += IndentDec();
+        }
+        
+        return result;
+    }
+
     public string VisitStatementList(StatementListNode stl)
     {
-        string result = "";//Ind() + "{\n" + IndInc();
-        var statements = stl.lst.Select(x => x.Visit(this)).ToList();
-        result += string.Join(";\n", statements);
-        //result += IndDec() + "\n" + Ind() + "}";
-        return result;
+        if (stl.lst == null || stl.lst.Count == 0)
+            return "";
+        
+        var statements = new List<string>();
+        bool oldInStatementList = _inStatementList;
+        _inStatementList = true;
+        
+        foreach (var stmt in stl.lst)
+        {
+            if (stmt != null)
+            {
+                // Не добавляем отступ для первого оператора в блоке
+                string formattedStmt;
+                if (statements.Count == 0 && _indentLevel == 0)
+                {
+                    formattedStmt = stmt.Visit(this);
+                }
+                else
+                {
+                    formattedStmt = Indent() + stmt.Visit(this);
+                }
+                statements.Add(formattedStmt);
+            }
+        }
+        
+        _inStatementList = oldInStatementList;
+        return string.Join(";\n", statements);
     }
 
     public string VisitBlockNode(BlockNode bin)
     {
-       return Ind() + "{\n" + IndInc()+ bin.lst.Visit(this)+IndDec() + "\n" + Ind() + "}";
-    }
-
-    public string VisitExprList(ExprListNode exlist) =>
-        string.Join(", ", exlist.lst.Select(VisitNode));
-
-    public string VisitProcCall(ProcCallNode p) =>
-       Ind()+ p.Name.Name + "(" + VisitNode(p.Pars) + ")";
-
-    public string VisitFuncCall(FuncCallNode f) =>
-       f.Name.Name + "(" + VisitNode(f.Pars) + ")";
-
-    // Добавляем методы для форматирования функций и return
-    public string VisitFuncDef(FuncDefNode f)
-    {
-        string parameters = string.Join(", ", f.Params.Select(p => p.Name));
-        string result = Ind() + "def " + f.Name.Name + "(" + parameters + ")\n" +
-                       IndInc() + VisitNode(f.Body) + IndDec();
+        string oldIndent = "";
+        if (!_inStatementList)
+        {
+            oldIndent = Indent();
+        }
+        
+        string result = oldIndent + "{\n";
+        
+        // Увеличиваем отступ для содержимого блока
+        IndentInc();
+        string body = VisitNode(bin.lst);
+        IndentDec();
+        
+        result += body;
+        
+        if (!string.IsNullOrEmpty(body) && !body.EndsWith("\n"))
+        {
+            result += "\n";
+        }
+        
+        result += Indent() + "}";
         return result;
     }
 
-    public string VisitFuncDefList(FuncDefListNode lst)
+    public string VisitExprList(ExprListNode exlist)
     {
-        string result = Ind() + "\n" + IndInc();
-        var functions = lst.lst.Select(x => x.Visit(this)).ToList();
-        result += string.Join(";\n", functions);
-        result += IndDec() + "\n" + Ind() + "";
+        if (exlist.lst == null || exlist.lst.Count == 0)
+            return "";
+        
+        return string.Join(", ", exlist.lst.Select(VisitNode));
+    }
+
+    public string VisitProcCall(ProcCallNode p)
+    {
+        return $"{p.Name.Name}({VisitNode(p.Pars)})";
+    }
+
+    public string VisitFuncCall(FuncCallNode f)
+    {
+        return $"{f.Name.Name}({VisitNode(f.Pars)})";
+    }
+
+    public string VisitFuncDef(FuncDefNode f)
+    {
+        string parameters = string.Join(", ", f.Params.Select(p => p.Name));
+        string body = VisitNode(f.Body);
+        
+        // Функция всегда начинается с новой строки
+        string result = $"{Indent()}def {f.Name.Name}({parameters})";
+        
+        // Если тело - блок, ставим его на той же строке
+        if (f.Body is BlockNode)
+        {
+            result += " ";
+        }
+        else
+        {
+            result += "\n" + IndentInc();
+        }
+        
+        result += body;
+        
+        if (!(f.Body is BlockNode))
+        {
+            result += IndentDec();
+        }
+        
         return result;
     }
 
     public string VisitReturn(ReturnNode r)
     {
         if (r.Expr != null)
-            return Ind() + "return " + VisitNode(r.Expr);
+            return $"{Indent()}return {VisitNode(r.Expr)}";
         else
-            return Ind() + "return";
+            return $"{Indent()}return";
     }
 
-    public string VisitFunDefAndStatements(FuncDefAndStatements fdandStmts)
+    public string VisitDefinitionsAndStatements(DefinitionsAndStatements defsAndStmts)
     {
-        return fdandStmts.GlobalVariablesList.Visit(this)+'\n'+ fdandStmts.FuncDefList.Visit(this)+'\n'+
-        fdandStmts.StatementList.Visit(this);
+        string definitions = defsAndStmts.DefinitionsList.Visit(this);
+        string mainProgram = defsAndStmts.MainProgram.Visit(this);
+        
+        // Добавляем пустую строку между определениями и основной программой
+        if (!string.IsNullOrEmpty(definitions) && !string.IsNullOrEmpty(mainProgram))
+        {
+            return definitions + "\n\n" + mainProgram;
+        }
+        else if (!string.IsNullOrEmpty(definitions))
+        {
+            return definitions;
+        }
+        else
+        {
+            return mainProgram;
+        }
+    }
+
+    public string VisitVariableDeclarationNode(VariableDeclarationNode varDecl)
+    {
+        return varDecl.vass.Visit(this);
+    }
+
+    public string VisitDefinitionsList(DefinitionsListNode defList)
+    {
+        if (defList.lst == null || defList.lst.Count == 0)
+            return "";
+        
+        var definitions = new List<string>();
+        
+        foreach (var def in defList.lst)
+        {
+            if (def != null)
+            {
+                // Для определений функций добавляем отступ
+                string formattedDef = Indent() + def.Visit(this);
+                definitions.Add(formattedDef);
+            }
+        }
+        
+        return string.Join(";\n", definitions);
     }
 }
-//  x = 1; while x < 10 do { print(x); x = x + 1 }
-// x = 1; while x < 10 do {  x = x + 1 }
