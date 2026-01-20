@@ -107,28 +107,24 @@ public class Parser : ParserBase<TokenType>
         DefinitionsListNode defList = new DefinitionsListNode();
         StatementNode mainProg;
     
-        // Вариант 1: Есть определения, затем основной блок
+      
         if (At(TokenType.tkDef) || At(TokenType.tkVar))
         {
             defList = DefinitionList();
-        
-            // После определений должен быть основной блок
+            
             if (At(TokenType.LBrace))
             {
                 mainProg = BlockStatement();
             }
             else
             {
-                // Если нет основного блока, создаем пустой
                 mainProg = new BlockNode(new StatementListNode());
             }
         }
-        // Вариант 2: Только основной блок (начинается с {)
         else if (At(TokenType.LBrace))
         {
             mainProg = BlockStatement();
         }
-        // Вариант 3: Пустая программа
         else
         {
             mainProg = new BlockNode(new StatementListNode());
@@ -357,7 +353,7 @@ public class Parser : ParserBase<TokenType>
         Requires(TokenType.LPar);
         
         var counter = Statement();
-        if (counter is not AssignNode assignCounter)
+        if (counter is not VarAssignNode assignCounter)
         {
             throw new CompilerExceptions.SyntaxException(
                 "Expected assignment in for loop initialization",

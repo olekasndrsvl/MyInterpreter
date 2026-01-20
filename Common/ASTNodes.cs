@@ -61,43 +61,71 @@ public interface IVisitorP
 public class Node
 {
     public Position Pos { get; set; }
-    
-    public virtual T Visit<T>(IVisitor<T> v) => v.VisitNode(this);
-    public virtual void VisitP(IVisitorP v) => v.VisitNode(this);
+
+    public virtual T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitNode(this);
+    }
+
+    public virtual void VisitP(IVisitorP v)
+    {
+        v.VisitNode(this);
+    }
 }
 
 public class DefinitionNode : Node
 {
-    public virtual T Visit<T>(IVisitor<T> v) => v.VisitDefinitionNode(this);
-    public virtual void VisitP(IVisitorP v) => v.VisitDefinitionNode(this);
+    public virtual T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitDefinitionNode(this);
+    }
+
+    public virtual void VisitP(IVisitorP v)
+    {
+        v.VisitDefinitionNode(this);
+    }
 }
 
 public class ExprNode : Node
 {
-    public override T Visit<T>(IVisitor<T> v) => v.VisitExprNode(this);
-    public override void VisitP(IVisitorP v) => v.VisitExprNode(this);
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitExprNode(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitExprNode(this);
+    }
 }
 
 public class StatementNode : Node
 {
-    public override T Visit<T>(IVisitor<T> v) => v.VisitStatementNode(this);
-    public override void VisitP(IVisitorP v) => v.VisitStatementNode(this);
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitStatementNode(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitStatementNode(this);
+    }
 }
 
 public class BinOpNode : ExprNode
 {
-    public ExprNode Left { get; set; }
-    public ExprNode Right { get; set; }
-    public TokenType Op { get; set; }
-    
     public BinOpNode(ExprNode Left, ExprNode Right, TokenType Op, Position pos = null)
     {
         this.Left = Left;
         this.Right = Right;
         this.Op = Op;
-        this.Pos = pos;
+        Pos = pos;
     }
-    
+
+    public ExprNode Left { get; set; }
+    public ExprNode Right { get; set; }
+    public TokenType Op { get; set; }
+
     public string OpToStr()
     {
         return Op switch
@@ -117,86 +145,150 @@ public class BinOpNode : ExprNode
             _ => throw new ArgumentException($"Unknown operator: {Op}")
         };
     }
-    
-    public override string ToString() => $"({Left}{OpToStr()}{Right})";
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitBinOp(this);
-    public override void VisitP(IVisitorP v) => v.VisitBinOp(this);
+
+    public override string ToString()
+    {
+        return $"({Left}{OpToStr()}{Right})";
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitBinOp(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitBinOp(this);
+    }
 }
 
 public class StatementListNode : StatementNode
 {
-    public List<StatementNode> lst = new List<StatementNode>();
-    
-    public void Add(StatementNode st) => lst.Add(st);
-    
-    public override string ToString() => string.Join("; ", lst);
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitStatementList(this);
-    public override void VisitP(IVisitorP v) => v.VisitStatementList(this);
-}
+    public List<StatementNode> lst = new();
 
+    public void Add(StatementNode st)
+    {
+        lst.Add(st);
+    }
+
+    public override string ToString()
+    {
+        return string.Join("; ", lst);
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitStatementList(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitStatementList(this);
+    }
+}
 
 public class ExprListNode : Node
 {
-    public List<ExprNode> lst = new List<ExprNode>();
-    
-    public void Add(ExprNode ex) => lst.Add(ex);
-    
-    public override string ToString() => string.Join(",", lst);
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitExprList(this);
-    public override void VisitP(IVisitorP v) => v.VisitExprList(this);
+    public List<ExprNode> lst = new();
+
+    public void Add(ExprNode ex)
+    {
+        lst.Add(ex);
+    }
+
+    public override string ToString()
+    {
+        return string.Join(",", lst);
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitExprList(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitExprList(this);
+    }
 }
 
 public class IntNode : ExprNode
 {
-    public int Val { get; set; }
-    
     public IntNode(int Value, Position p = null)
     {
         Val = Value;
         Pos = p;
     }
-    
-    public override string ToString() => Val.ToString();
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitInt(this);
-    public override void VisitP(IVisitorP v) => v.VisitInt(this);
+
+    public int Val { get; set; }
+
+    public override string ToString()
+    {
+        return Val.ToString();
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitInt(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitInt(this);
+    }
 }
 
 public class DoubleNode : ExprNode
 {
-    public double Val { get; set; }
-    
     public DoubleNode(double Value, Position p = null)
     {
         Val = Value;
         Pos = p;
     }
-    
-    public override string ToString() => Val.ToString();
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitDouble(this);
-    public override void VisitP(IVisitorP v) => v.VisitDouble(this);
+
+    public double Val { get; set; }
+
+    public override string ToString()
+    {
+        return Val.ToString();
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitDouble(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitDouble(this);
+    }
 }
 
 public class IdNode : ExprNode
 {
-    public string Name { get; set; }
-    public int ind; // индекс в таблице VarValues
-    public SemanticType ValueType { get; set; } // тип значения
-    
     public IdNode(string name, Position p = null)
     {
         Name = name;
         Pos = p;
     }
-    
-    public override string ToString() => Name;
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitId(this);
-    public override void VisitP(IVisitorP v) => v.VisitId(this);
+
+    public string Name { get; set; }
+    public SemanticType ValueType { get; set; } // тип значения
+
+    public override string ToString()
+    {
+        return Name;
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitId(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitId(this);
+    }
 }
 
 public class VariableDeclarationNode : DefinitionNode
@@ -208,59 +300,78 @@ public class VariableDeclarationNode : DefinitionNode
         this.vass = vass;
         Pos = p;
     }
-    public override T Visit<T>(IVisitor<T> v) => v.VisitVariableDeclarationNode(this);
-    public override void VisitP(IVisitorP v) => v.VisitVariableDeclarationNode(this);
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitVariableDeclarationNode(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitVariableDeclarationNode(this);
+    }
 }
 
 public class VarAssignNode : StatementNode
 {
-    public IdNode Ident { get; set; }
-    public ExprNode Expr { get; set; }
-    
     public VarAssignNode(IdNode Ident = null, ExprNode Expr = null, Position p = null)
     {
         this.Ident = Ident;
         this.Expr = Expr;
         Pos = p;
     }
-    
+
+    public IdNode Ident { get; set; }
+    public ExprNode Expr { get; set; }
+
     public override string ToString()
     {
         var exstr = Expr.ToString();
         return $"var {Ident} = {exstr}";
     }
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitVarAssign(this);
-    public override void VisitP(IVisitorP v) => v.VisitVarAssign(this);
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitVarAssign(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitVarAssign(this);
+    }
 }
 
 public class AssignNode : StatementNode
 {
-    public IdNode Ident { get; set; }
-    public ExprNode Expr { get; set; }
     public AssignNode(IdNode Ident, ExprNode Expr, Position p = null)
     {
         this.Ident = Ident;
         this.Expr = Expr;
         Pos = p;
     }
-    
+
+    public IdNode Ident { get; set; }
+    public ExprNode Expr { get; set; }
+
     public override string ToString()
     {
         var exstr = Expr.ToString();
         return $"{Ident} = {exstr}";
     }
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitAssign(this);
-    public override void VisitP(IVisitorP v) => v.VisitAssign(this);
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitAssign(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitAssign(this);
+    }
 }
 
 public class AssignOpNode : StatementNode
 {
-    public IdNode Ident { get; set; }
-    public ExprNode Expr { get; set; }
-    public char Op { get; set; } // + - * /
-    
     public AssignOpNode(IdNode Ident, ExprNode Expr, char op, Position p = null)
     {
         this.Ident = Ident;
@@ -268,37 +379,59 @@ public class AssignOpNode : StatementNode
         Op = op;
         Pos = p;
     }
-    
+
+    public IdNode Ident { get; set; }
+    public ExprNode Expr { get; set; }
+    public char Op { get; set; } // + - * /
+
     public override string ToString()
     {
         var exstr = Expr.ToString();
         return $"{Ident} {Op}= {exstr}";
     }
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitAssignOp(this);
-    public override void VisitP(IVisitorP v) => v.VisitAssignOp(this);
-}
 
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitAssignOp(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitAssignOp(this);
+    }
+}
 
 public class BlockNode(StatementListNode stl) : StatementNode
 {
+    public NameSpace BlockNameSpace;
     public StatementListNode lst = stl;
 
-    public NameSpace BlockNameSpace;
-    public void Add(StatementNode st) => lst.Add(st);
-    public override string ToString() => string.Join("; ", lst);
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitBlockNode(this);
-    public override void VisitP(IVisitorP v) => v.VisitBlockNode(this);
-    
+    public void Add(StatementNode st)
+    {
+        lst.Add(st);
+    }
+
+    public override string ToString()
+    {
+        return string.Join("; ", lst);
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitBlockNode(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitBlockNode(this);
+    }
 }
+
 public class IfNode : StatementNode
 {
-    public ExprNode Condition { get; set; }
-    public StatementNode ThenStat { get; set; }
-    public LightWeightNameSpace TheNameSpaceSpace;
-    public StatementNode ElseStat { get; set; }
     public LightWeightNameSpace ElseNameSpace;
+    public LightWeightNameSpace ThenNameSpaceSpace;
+
     public IfNode(ExprNode Condition, StatementNode ThenStat, StatementNode ElseStat, Position p = null)
     {
         this.Condition = Condition;
@@ -306,7 +439,11 @@ public class IfNode : StatementNode
         this.ElseStat = ElseStat;
         Pos = p;
     }
-    
+
+    public ExprNode Condition { get; set; }
+    public StatementNode ThenStat { get; set; }
+    public StatementNode ElseStat { get; set; }
+
     public override string ToString()
     {
         var result = $"if {Condition} then {ThenStat}";
@@ -314,100 +451,155 @@ public class IfNode : StatementNode
             result += $" else {ElseStat}";
         return result;
     }
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitIf(this);
-    public override void VisitP(IVisitorP v) => v.VisitIf(this);
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitIf(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitIf(this);
+    }
 }
 
 public class WhileNode : StatementNode
 {
-    public ExprNode Condition { get; set; }
-    public StatementNode Stat { get; set; }
     public LightWeightNameSpace WhileNameSpace;
-    
+
     public WhileNode(ExprNode Condition, StatementNode Stat, Position p = null)
     {
         this.Condition = Condition;
         this.Stat = Stat;
         Pos = p;
     }
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitWhile(this);
-    public override void VisitP(IVisitorP v) => v.VisitWhile(this);
+
+    public ExprNode Condition { get; set; }
+    public StatementNode Stat { get; set; }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitWhile(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitWhile(this);
+    }
 }
+
 public class ForNode : StatementNode
 {
-    public AssignNode Counter { get; set; }
-    public ExprNode Condition { get; set; }
     public LightWeightNameSpace ForNameSpace;
-    public AssignOpNode Increment { get; set; }
-    public StatementNode Stat { get; set; }
-    
-    public ForNode(AssignNode counter,ExprNode Condition, AssignOpNode increment, StatementNode Stat, Position p = null)
+
+    public ForNode(VarAssignNode counter, ExprNode Condition, AssignOpNode increment, StatementNode Stat,
+        Position p = null)
     {
         this.Condition = Condition;
-        this.Counter = counter;
-        this.Increment = increment;
+        Counter = counter;
+        Increment = increment;
         this.Stat = Stat;
         Pos = p;
     }
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitFor(this);
-    public override void VisitP(IVisitorP v) => v.VisitFor(this);
+
+    public VarAssignNode Counter { get; set; }
+    public ExprNode Condition { get; set; }
+    public AssignOpNode Increment { get; set; }
+    public StatementNode Stat { get; set; }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitFor(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitFor(this);
+    }
 }
+
 public class ProcCallNode : StatementNode
 {
-    public IdNode Name { get; set; }
-    public ExprListNode Pars { get; set; }
-    
     public ProcCallNode(IdNode Name, ExprListNode Pars, Position p = null)
     {
         this.Name = Name;
         this.Pars = Pars;
         Pos = p;
     }
-    
-    public override string ToString() => $"{Name}({string.Join(",", Pars.lst)})";
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitProcCall(this);
-    public override void VisitP(IVisitorP v) => v.VisitProcCall(this);
+
+    public IdNode Name { get; set; }
+    public ExprListNode Pars { get; set; }
+
+    public override string ToString()
+    {
+        return $"{Name}({string.Join(",", Pars.lst)})";
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitProcCall(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitProcCall(this);
+    }
 }
 
 public class DefinitionsListNode : DefinitionNode
 {
-    public List<DefinitionNode> lst = new List<DefinitionNode>();
-    public void Add(DefinitionNode def) => lst.Add(def);
-    public override string ToString() => string.Join(";\n", lst);
-    public override T Visit<T>(IVisitor<T> v) => v.VisitDefinitionsList(this);
-    public override void VisitP(IVisitorP v) => v.VisitDefinitionsList(this);
+    public List<DefinitionNode> lst = new();
 
+    public void Add(DefinitionNode def)
+    {
+        lst.Add(def);
+    }
+
+    public override string ToString()
+    {
+        return string.Join(";\n", lst);
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitDefinitionsList(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitDefinitionsList(this);
+    }
 }
+
 public class DefinitionsAndStatements : Node
 {
+    public DefinitionsAndStatements(DefinitionsListNode DefList, StatementNode statementList, Position p = null)
+    {
+        MainProgram = statementList;
+        DefinitionsList = DefList;
+        Pos = p;
+    }
+
     public StatementNode MainProgram { get; set; }
     public DefinitionsListNode DefinitionsList { get; set; }
 
-    public DefinitionsAndStatements(DefinitionsListNode DefList,StatementNode statementList,  Position p = null)
+    public override T Visit<T>(IVisitor<T> v)
     {
-        this.MainProgram = statementList;
-        this.DefinitionsList = DefList;
-        Pos = p;
+        return v.VisitDefinitionsAndStatements(this);
     }
-    public override T Visit<T>(IVisitor<T> v) => v.VisitDefinitionsAndStatements(this);
-    public override void VisitP(IVisitorP v) => v.VisitDefinitionsAndStatements(this);
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitDefinitionsAndStatements(this);
+    }
 }
 
-public class FuncDefNode: DefinitionNode
+public class FuncDefNode : DefinitionNode
 {
-    public IdNode Name { get; set; }
-    public List<IdNode> Params { get; set; }
-    public StatementNode Body { get; set; }
-    public SemanticType ReturnType { get; set; }
-
     public FuncDefNode()
     {
-     
     }
+
     public FuncDefNode(IdNode Name, List<IdNode> Params, StatementNode Body, Position p = null)
     {
         this.Name = Name;
@@ -415,42 +607,81 @@ public class FuncDefNode: DefinitionNode
         this.Body = Body;
         Pos = p;
     }
-        
-    public override string ToString() => $"def {Name}({string.Join(",", Params)}) {Body}";
-    public override T Visit<T>(IVisitor<T> v) => v.VisitFuncDef(this);
-    public override void VisitP(IVisitorP v) => v.VisitFuncDef(this);
+
+    public IdNode Name { get; set; }
+    public List<IdNode> Params { get; set; }
+    public StatementNode Body { get; set; }
+    public SemanticType ReturnType { get; set; }
+
+    public override string ToString()
+    {
+        return $"def {Name}({string.Join(",", Params)}) {Body}";
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitFuncDef(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitFuncDef(this);
+    }
 }
+
 public class ReturnNode : StatementNode
 {
-    public ExprNode Expr { get; set; }
-    
     public ReturnNode(ExprNode expr, Position p = null)
     {
         Expr = expr;
         Pos = p;
     }
-    
-    public override string ToString() => $"return {Expr}";
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitReturn(this);
-    public override void VisitP(IVisitorP v) => v.VisitReturn(this);
+
+    public ExprNode Expr { get; set; }
+
+    public override string ToString()
+    {
+        return $"return {Expr}";
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitReturn(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitReturn(this);
+    }
 }
 
 public class FuncCallNode : ExprNode
 {
-    public IdNode Name { get; set; }
-    public ExprListNode Pars { get; set; }
     public SemanticType ValueType;
-    public int SpecializationId { get; set; } = -1; // -1 означает отсутствие специализации
+
     public FuncCallNode(IdNode Name, ExprListNode Pars, Position p = null)
     {
         this.Name = Name;
         this.Pars = Pars;
         Pos = p;
     }
-    
-    public override string ToString() => $"{Name}({string.Join(",", Pars.lst)})";
-    
-    public override T Visit<T>(IVisitor<T> v) => v.VisitFuncCall(this);
-    public override void VisitP(IVisitorP v) => v.VisitFuncCall(this);
+
+    public IdNode Name { get; set; }
+    public ExprListNode Pars { get; set; }
+    public int SpecializationId { get; set; } = -1; // -1 означает отсутствие специализации
+
+    public override string ToString()
+    {
+        return $"{Name}({string.Join(",", Pars.lst)})";
+    }
+
+    public override T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitFuncCall(this);
+    }
+
+    public override void VisitP(IVisitorP v)
+    {
+        v.VisitFuncCall(this);
+    }
 }

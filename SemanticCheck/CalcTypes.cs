@@ -122,18 +122,32 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     public SemanticType VisitBinOp(BinOpNode bin)
     {
         var lt = bin.Left.Visit(this);
+        
         var rt = bin.Right.Visit(this);
         
         if (Constants.ArithmeticOperations.Contains(bin.Op))
         {
             if (!Constants.NumTypes.Contains(lt) || !Constants.NumTypes.Contains(rt))
                 CompilerExceptions.SemanticError($"Операция {bin.OpToStr()} не определена для типов {lt} и {rt}", bin.Left.Pos);
+        
+            // Особые случаи для AnyType
+            if (lt == SemanticType.AnyType || rt == SemanticType.AnyType)
+            { 
+                return SemanticType.AnyType;
+            }
             else if (bin.Op == TokenType.Divide)
+            {
                 return SemanticType.DoubleType;
+            }
             else if (lt == rt)
+            {
                 return lt;
+            }
             else 
+            {
+                // IntType и DoubleType -> DoubleType
                 return SemanticType.DoubleType;
+            }
         }
         else if (Constants.LogicalOperations.Contains(bin.Op))
         {

@@ -1,68 +1,83 @@
 ﻿using MyInterpreter.SemanticCheck;
 
 namespace MyInterpreter;
+
 using static SymbolTree;
-using static MyInterpreter.TypeChecker;
+using static TypeChecker;
 
 public class SemanticCheckVisitor : AutoVisitor
 {
     // Храним информацию о текущей проверяемой функции для рекурсивных вызовов
-    private string _currentFunction = null;
-    private static Stack<FunctionSpecialization> _currentCheckingFunctionSpecialization = new Stack<FunctionSpecialization>();
-    private NameSpace _currentNamespace;
+    private static readonly Stack<FunctionSpecialization> _currentCheckingFunctionSpecialization = new();
+    private static NameSpace _currentNamespace;
 
     static SemanticCheckVisitor()
     {
-        if(FunctionTable.TryGetValue("Main", out var functionTable))
+        _currentNamespace = SymbolTree.Global;
+        if (FunctionTable.TryGetValue("Main", out var functionTable))
             _currentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
         else
-            throw new CompilerExceptions.UnExpectedException("Something went wrong! We have no Main function in function table!");
-    }
-    
-    public static void Reset()
-    {
-        _currentCheckingFunctionSpecialization.Clear();
-        if(FunctionTable.TryGetValue("Main", out var functionTable))
-            _currentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
-        else
-            throw new CompilerExceptions.UnExpectedException("Something went wrong! We have no Main function in function table!");
-        
-      
+            throw new CompilerExceptions.UnExpectedException(
+                "Something went wrong! We have no Main function in function table!");
     }
 
+    public static void Reset()
+    {
+        _currentNamespace = SymbolTree.Global;
+        _currentCheckingFunctionSpecialization.Clear();
+        if (FunctionTable.TryGetValue("Main", out var functionTable))
+            _currentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
+        else
+            throw new CompilerExceptions.UnExpectedException(
+                "Something went wrong! We have no Main function in function table!");
+    }
+
+    public override void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
+    {
+        DefandStmts.DefinitionsList.VisitP(this);
+        
+        _currentNamespace = _currentCheckingFunctionSpecialization.Peek().NameSpace;
+        
+        DefandStmts.MainProgram.VisitP(this);
+    }
     public override void VisitVarAssign(VarAssignNode vass)
     {
         vass.Expr.VisitP(this);
-        var typ = CalcTypeVis(vass.Expr,_currentNamespace);
+        var typ = CalcTypeVis(vass.Expr, _currentNamespace);
+        _currentNamespace.AddVariable(vass.Ident.Name,typ);
         vass.Ident.ValueType = typ;
     }
 
+    
     public override void VisitBlockNode(BlockNode bln)
     {
-        
+        bln.BlockNameSpace = _currentNamespace.CreateLightWeightChild("BlockOfCode");
+        _currentNamespace = bln.BlockNameSpace;
         bln.lst.VisitP(this);
+        _currentNamespace = _currentNamespace.Parent;
     }
+
     public override void VisitAssign(AssignNode ass)
     {
         ass.Expr.VisitP(this);
-         // Вычислить тип
-        var typ = CalcTypeVis(ass.Expr,_currentNamespace);
+        // Вычислить тип
+        var typ = CalcTypeVis(ass.Expr, _currentNamespace);
         ass.Ident.ValueType = typ;
         var variable = _currentNamespace.LookupVariable(ass.Ident.Name);
-        if (_currentCheckingFunctionSpecialization.Count > 0 && variable !=null )
+        if (_currentCheckingFunctionSpecialization.Count > 0 && variable != null)
         {
             if (FunctionTable.ContainsKey(ass.Ident.Name))
-            {
                 CompilerExceptions.SemanticError("Переменная не может иметь имя функции!", ass.Ident.Pos);
-            }
             // Функции присваивать нельзя
             if (variable.Kind == KindType.FuncName)
-                CompilerExceptions.SemanticError($"Имени стандартной функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
+                CompilerExceptions.SemanticError(
+                    $"Имени стандартной функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
             // Вычислить тип
             var idtyp = variable.Type;
-            
+
             if (!AssignComparable(idtyp, typ))
-                CompilerExceptions.SemanticError($"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
+                CompilerExceptions.SemanticError(
+                    $"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
             ass.Ident.ValueType = typ;
         }
         else
@@ -70,66 +85,105 @@ public class SemanticCheckVisitor : AutoVisitor
             CompilerExceptions.SemanticError($"Переменная с именем {ass.Ident.Name} не объявлена!", ass.Ident.Pos);
         }
     }
-    
+
     public override void VisitAssignOp(AssignOpNode ass)
     {
-        var symTable = _currentCheckingFunctionSpecialization.Peek().NameSpace.Variables;
+      
         ass.Expr.VisitP(this);
-        
-        if (!symTable.ContainsKey(ass.Ident.Name))
+
+        if (_currentNamespace.LookupVariable(ass.Ident.Name)==null)
         {
             CompilerExceptions.SemanticError($"Переменная {ass.Ident.Name} не определена", ass.Ident.Pos);
         }
         else
         {
             // Функции присваивать нельзя
-            if (symTable[ass.Ident.Name].Kind == KindType.FuncName)
-                CompilerExceptions.SemanticError($"Имени стандартной функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
-            
-            var typ = CalcTypeVis(ass.Expr,_currentNamespace);
-            var idtyp = symTable[ass.Ident.Name].Type;
-            
+            if (_currentNamespace.LookupVariable(ass.Ident.Name).Kind == KindType.FuncName)
+                CompilerExceptions.SemanticError(
+                    $"Имени стандартной функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
+
+            var typ = CalcTypeVis(ass.Expr, _currentNamespace);
+            var idtyp = _currentNamespace.LookupVariable(ass.Ident.Name).Type;
+
             if (idtyp != SemanticType.IntType && idtyp != SemanticType.DoubleType)
                 CompilerExceptions.SemanticError($"Операция {ass.Op} не определена для типа {idtyp}", ass.Ident.Pos);
-            
+
             if (idtyp == SemanticType.IntType && ass.Op == '/')
                 CompilerExceptions.SemanticError($"Операция {ass.Op} не определена для типа {idtyp}", ass.Ident.Pos);
-            
+
             if (!AssignComparable(idtyp, typ))
-                CompilerExceptions.SemanticError($"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
-            
-            
-         
+                CompilerExceptions.SemanticError(
+                    $"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
+
+
             ass.Ident.ValueType = typ;
         }
     }
-    
+
     public override void VisitIf(IfNode ifn)
     {
         ifn.Condition.VisitP(this);
-        var typ = CalcTypeVis(ifn.Condition,_currentNamespace);
-        if (typ != SemanticType.BoolType)
-            CompilerExceptions.SemanticError($"Ожидалось выражение логического типа, а встречено выражение типа {typ}", ifn.Condition.Pos);
+        var typ = CalcTypeVis(ifn.Condition, _currentNamespace);
         
+        
+        if (typ != SemanticType.BoolType)
+            CompilerExceptions.SemanticError($"Ожидалось выражение логического типа, а встречено выражение типа {typ}",
+                ifn.Condition.Pos);
+        
+        
+        ifn.ThenNameSpaceSpace = _currentNamespace.CreateLightWeightChild("if_then");
+        _currentNamespace = ifn.ThenNameSpaceSpace;
         ifn.ThenStat.VisitP(this);
+        _currentNamespace = _currentNamespace.Parent;
+        
         if (ifn.ElseStat != null)
+        {  
+            ifn.ElseNameSpace = _currentNamespace.CreateLightWeightChild("if_else");
+            _currentNamespace = ifn.ThenNameSpaceSpace;
             ifn.ElseStat.VisitP(this);
+            _currentNamespace = _currentNamespace.Parent;
+        }
     }
-    
+
     public override void VisitWhile(WhileNode whn)
     {
+        whn.WhileNameSpace = _currentNamespace.CreateLightWeightChild("while");
+        _currentNamespace = whn.WhileNameSpace;
+        
         whn.Condition.VisitP(this);
         var typ = CalcTypeVis(whn.Condition, _currentNamespace);
-        if (typ != SemanticType.BoolType)
-            CompilerExceptions.SemanticError($"Ожидалось выражение логического типа, а встречено выражение типа {typ}", whn.Condition.Pos);
         
+        if (typ != SemanticType.BoolType)
+            CompilerExceptions.SemanticError($"Ожидалось выражение логического типа, а встречено выражение типа {typ}",
+                whn.Condition.Pos);
+
         whn.Stat.VisitP(this);
+        
+        _currentNamespace = _currentNamespace.Parent;
     }
-    
+
+    public override void VisitFor(ForNode forNode)
+    {
+        forNode.ForNameSpace=_currentNamespace.CreateLightWeightChild("for_node");
+        _currentNamespace = forNode.ForNameSpace;
+        forNode.Counter.VisitP(this);
+        forNode.Condition.VisitP(this);
+        var typ = CalcTypeVis(forNode.Condition, _currentNamespace);
+        
+        if (typ != SemanticType.BoolType)
+            CompilerExceptions.SemanticError($"Ожидалось выражение логического типа, а встречено выражение типа {typ}",
+                forNode.Condition.Pos);
+        forNode.Increment.VisitP(this);
+        forNode.Stat.VisitP(this);
+        _currentNamespace = _currentNamespace.Parent;
+        
+        
+    }
+
     public override void VisitId(IdNode id)
     {
-        var symTable = _currentCheckingFunctionSpecialization.Peek().NameSpace.Variables;
-        if (!symTable.ContainsKey(id.Name) && _currentCheckingFunctionSpecialization.Count==0)
+       
+        if (  _currentNamespace.LookupVariable(id.Name) == null && _currentCheckingFunctionSpecialization.Count == 0)
         {
             CompilerExceptions.SemanticError($"Идентификатор {id.Name} не определен", id.Pos);
             return;
@@ -137,62 +191,61 @@ public class SemanticCheckVisitor : AutoVisitor
 
         if (_currentCheckingFunctionSpecialization.Count > 0)
         {
-            if(!symTable.ContainsKey(id.Name))
+            if (_currentNamespace.LookupVariable(id.Name)==null)
             {
                 CompilerExceptions.SemanticError($"Идентификатор {id.Name} не определен", id.Pos);
                 return;
             }
-            
-            id.ValueType =symTable[id.Name].Type;
+
+            id.ValueType =  _currentNamespace.LookupVariable(id.Name).Type;
             return;
         }
-        
-        var symbol = symTable[id.Name];
+
+        var symbol =  _currentNamespace.LookupVariable(id.Name);
         id.ValueType = symbol.Type;
     }
-    
+
     public override void VisitFuncDef(FuncDefNode node)
     {
+        
         // Проверяем, не объявлена ли уже функция с таким именем
         if (FunctionTable.ContainsKey(node.Name.Name))
         {
             CompilerExceptions.SemanticError($"Функция '{node.Name.Name}' уже объявлена", node.Name.Pos);
             return;
         }
+
+        if (_currentNamespace != SymbolTree.Global)
+        {
+            throw new CompilerExceptions.UnExpectedException("Определение функции оказалось не в глобальном пространстве имен!");
+        }
         
         // Сохраняем определение функции
         FunctionTable[node.Name.Name] = new FunctionInfo();
         FunctionTable[node.Name.Name].Definition = node;
 
+       
+        
         // Добавляем функцию с типами AnyType - конкретные типы будут выведены при вызовах
         var paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
-        var funcSpec = new FunctionSpecialization(paramTypes);
-        
-        
-        
+        var paramNames = FunctionTable[node.Name.Name].Definition.Params.Select(x => x.Name).ToArray();
+        // var funcSpec = new FunctionSpecialization(paramTypes, FunctionTable[node.Name.Name],
+        //    SemanticType.AnyType, paramNames);
+
+        var funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
         // Тут проверим тело функции для AnyType
-       
-        for (int i = 0; i <  FunctionTable[node.Name.Name].Definition.Params.Count; i++)
-        {
-            var param =  FunctionTable[node.Name.Name].Definition.Params[i];
-            var paramType = funcSpec.ParameterTypes[i];
-            funcSpec.NameSpace.Variables.Add(param.Name, new SymbolInfo(param.Name, KindType.VarName, paramType));
-        }
-        
         _currentCheckingFunctionSpecialization.Push(funcSpec);
-                
+        _currentNamespace = funcSpec.NameSpace;
         var returnTypes = new List<SemanticType>();
-        CollectReturnTypes( FunctionTable[node.Name.Name].Definition.Body, returnTypes);
+        CollectReturnTypes(FunctionTable[node.Name.Name].Definition.Body, returnTypes);
 
         // Выводим тип возвращаемого значения
         if (returnTypes.Count > 0)
         {
             // Находим общий тип всех return statements
-            SemanticType inferredReturnType = returnTypes[0];
-            for (int i = 1; i < returnTypes.Count; i++)
-            {
+            var inferredReturnType = returnTypes[0];
+            for (var i = 1; i < returnTypes.Count; i++)
                 inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
-            }
             funcSpec.ReturnType = inferredReturnType;
         }
         else
@@ -200,77 +253,75 @@ public class SemanticCheckVisitor : AutoVisitor
             // Если нет return statements, то тип NoType
             funcSpec.ReturnType = SemanticType.NoType;
         }
-        
-        // Инициализируем специализации для этой функции
-        if (FunctionTable.ContainsKey(node.Name.Name))
-        {
-            FunctionTable[node.Name.Name].Specializations =new List<FunctionSpecialization>();
-        }
-        
+
+      
+
         node.Body.VisitP(this);
-        
-        if(_currentCheckingFunctionSpecialization.Count>1)
+        _currentNamespace = _currentNamespace.Parent;
+        if (_currentCheckingFunctionSpecialization.Count > 1)
             _currentCheckingFunctionSpecialization.Pop();
+        //Global.Children.Remove(Global.Children.Find(x=>x.Name == node.Name.Name+"_0"));
     }
 
     public override void VisitFuncCall(FuncCallNode f)
     {
-        var symTable = _currentCheckingFunctionSpecialization.Peek().NameSpace.Variables;
-        
-        
         if (!FunctionTable.ContainsKey(f.Name.Name))
         {
             CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
             return;
         }
+
         var funcInfo = FunctionTable[f.Name.Name];
-        
-        
-        if (_currentCheckingFunctionSpecialization.Peek().ReturnType == SemanticType.NoType)
-        {
-            CompilerExceptions.SemanticError("Попытка вызвать процедуру " + f.Name.Name + " как функцию", f.Name.Pos);
-            return;
-        }
-        
+
+
+      
         // Вычисляем типы аргументов
         var argTypes = new List<SemanticType>();
         foreach (var arg in f.Pars.lst)
         {
             arg.VisitP(this);
-            argTypes.Add(CalcTypeVis(arg,_currentNamespace));
+            argTypes.Add(CalcTypeVis(arg, _currentNamespace));
         }
         
+        if (SymbolTree.FunctionTable[f.Name.Name].FindOrCreateSpecialization(argTypes.ToArray()).ReturnType == SemanticType.NoType)
+        {
+            CompilerExceptions.SemanticError("Попытка вызвать процедуру " + f.Name.Name + " как функцию", f.Name.Pos);
+            return;
+        }
+
         // Проверяем количество параметров
         if (funcInfo.Definition.Params.Count() != f.Pars.lst.Count)
         {
-            CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове функции " + f.Name.Name, f.Name.Pos);
+            CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове функции " + f.Name.Name,
+                f.Name.Pos);
             return;
         }
-        
+
         // Ищем подходящую специализацию функции
-        FunctionSpecialization specialization = FunctionTable[f.Name.Name].FindOrCreateSpecialization(argTypes.ToArray());
-        
+        var specialization = FunctionTable[f.Name.Name].FindOrCreateSpecialization(argTypes.ToArray());
         
         // Проверяем совместимость типов аргументов
-        for (int i = 0; i < specialization.ParameterTypes.Length; i++)
+        for (var i = 0; i < specialization.ParameterTypes.Length; i++)
         {
             var argType = argTypes[i];
             var paramType = specialization.ParameterTypes[i];
-            
+
             if (!AssignComparable(paramType, argType))
-            {
-                CompilerExceptions.SemanticError($"Тип аргумента функции {argType} не соответствует типу формального параметра {paramType}", f.Name.Pos);
-            }
+                CompilerExceptions.SemanticError(
+                    $"Тип аргумента функции {argType} не соответствует типу формального параметра {paramType}",
+                    f.Name.Pos);
         }
-        
+
         // Если тело функции еще не проверено для этой специализации, проверяем его
         if (!specialization.BodyChecked)
         {
             specialization.BodyChecked = true;
+            var oldNamespace = _currentNamespace;
+            _currentNamespace = specialization.NameSpace;
             CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
-          
+            _currentNamespace=oldNamespace;
         }
-        
+
         // Устанавливаем тип возвращаемого значения для вызова функции
         f.ValueType = specialization.ReturnType;
         f.SpecializationId = specialization.SpecializationId;
@@ -283,62 +334,41 @@ public class SemanticCheckVisitor : AutoVisitor
             CompilerExceptions.SemanticError($"Не найдено определение функции '{functionName}'", new Position(0, 0));
             return;
         }
-
-        // Сохраняем текущую функцию
-        var previousFunction = _currentFunction;
-        _currentFunction = functionName;
-
+        
         try
         {
-            try
-            {
-                // Добавляем параметры в таблицу символов с конкретными типами из специализации
-                for (int i = 0; i < functionDef.Definition.Params.Count; i++)
-                {
-                    var param = functionDef.Definition.Params[i];
-                    var paramType = specialization.ParameterTypes[i];
-                    specialization.NameSpace.Variables.Add(param.Name, new SymbolInfo(param.Name, KindType.VarName, paramType));
-                }
-                
-                
-                
-                // Обходим тело функции и собираем типы всех return statements
-                _currentCheckingFunctionSpecialization.Push(specialization);
-                
-                var returnTypes = new List<SemanticType>();
-                CollectReturnTypes(functionDef.Definition.Body, returnTypes);
+           
 
-                // Выводим тип возвращаемого значения
-                if (returnTypes.Count > 0)
-                {
-                    // Находим общий тип всех return statements
-                    SemanticType inferredReturnType = returnTypes[0];
-                    for (int i = 1; i < returnTypes.Count; i++)
-                    {
-                        inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
-                    }
-                    specialization.ReturnType = inferredReturnType;
-                }
-                else
-                {
-                    // Если нет return statements, то тип NoType
-                    specialization.ReturnType = SemanticType.NoType;
-                }
-                
-                functionDef.Definition.Body.VisitP(this);
-              
-            }
-            finally
+            // Обходим тело функции и собираем типы всех return statements
+            _currentCheckingFunctionSpecialization.Push(specialization);
+
+            var returnTypes = new List<SemanticType>();
+            CollectReturnTypes(functionDef.Definition.Body, returnTypes);
+
+            // Выводим тип возвращаемого значения
+            if (returnTypes.Count > 0)
             {
-                
-                if(_currentCheckingFunctionSpecialization.Count>1)
-                    _currentCheckingFunctionSpecialization.Pop();
+                // Находим общий тип всех return statements
+                var inferredReturnType = returnTypes[0];
+                for (var i = 1; i < returnTypes.Count; i++)
+                    inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
+                specialization.ReturnType = inferredReturnType;
             }
+            else
+            {
+                // Если нет return statements, то тип NoType
+                specialization.ReturnType = SemanticType.NoType;
+            }
+
+            functionDef.Definition.Body.VisitP(this);
         }
         finally
         {
-            _currentFunction = previousFunction;
+            if (_currentCheckingFunctionSpecialization.Count > 1)
+                _currentCheckingFunctionSpecialization.Pop();
         }
+        
+        
     }
 
     private void CollectReturnTypes(StatementNode node, List<SemanticType> returnTypes)
@@ -348,11 +378,9 @@ public class SemanticCheckVisitor : AutoVisitor
             if (returnNode.Expr != null)
             {
                 // Вычисляем тип выражения в return
-                var returnType = CalcTypeVis(returnNode.Expr,_currentNamespace);
-                if(returnTypes.Count ==0)
-                {
+                var returnType = CalcTypeVis(returnNode.Expr, _currentNamespace);
+                if (returnTypes.Count == 0)
                     _currentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
-                }
                 returnTypes.Add(returnType);
             }
             else
@@ -362,18 +390,16 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         else if (node is StatementListNode statementList)
         {
-            foreach (var stmt in statementList.lst)
-            {
-                CollectReturnTypes(stmt, returnTypes);
-            }
+            foreach (var stmt in statementList.lst) CollectReturnTypes(stmt, returnTypes);
+        }
+        else if (node is BlockNode blcNode)
+        {
+            foreach (var stmt in blcNode.lst.lst) CollectReturnTypes(stmt, returnTypes);
         }
         else if (node is IfNode ifNode)
         {
             CollectReturnTypes(ifNode.ThenStat, returnTypes);
-            if (ifNode.ElseStat != null)
-            {
-                CollectReturnTypes(ifNode.ElseStat, returnTypes);
-            }
+            if (ifNode.ElseStat != null) CollectReturnTypes(ifNode.ElseStat, returnTypes);
         }
         else if (node is WhileNode whileNode)
         {
@@ -402,7 +428,7 @@ public class SemanticCheckVisitor : AutoVisitor
         if (node.Expr != null)
         {
             node.Expr.VisitP(this);
-            var returnType = TypeChecker.CalcTypeVis(node.Expr,_currentNamespace);
+            var returnType = CalcTypeVis(node.Expr, _currentNamespace);
         }
     }
 }

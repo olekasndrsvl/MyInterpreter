@@ -2,13 +2,33 @@
 
 public class AutoVisitor : IVisitorP
 {
-    public virtual void VisitNode(Node n) { }
-    public void VisitDefinitionNode(DefinitionNode defNode) {}
-    public virtual void VisitExprNode(ExprNode n) { }
-    public virtual void VisitStatementNode(StatementNode n) { }
-    public virtual void VisitInt(IntNode n) { }
-    public virtual void VisitDouble(DoubleNode n) { }
-    public virtual void VisitId(IdNode n) { }
+    public virtual void VisitNode(Node n)
+    {
+    }
+
+    public void VisitDefinitionNode(DefinitionNode defNode)
+    {
+    }
+
+    public virtual void VisitExprNode(ExprNode n)
+    {
+    }
+
+    public virtual void VisitStatementNode(StatementNode n)
+    {
+    }
+
+    public virtual void VisitInt(IntNode n)
+    {
+    }
+
+    public virtual void VisitDouble(DoubleNode n)
+    {
+    }
+
+    public virtual void VisitId(IdNode n)
+    {
+    }
 
     public virtual void VisitBinOp(BinOpNode bin)
     {
@@ -52,7 +72,6 @@ public class AutoVisitor : IVisitorP
     }
 
 
-
     public virtual void VisitIf(IfNode ifn)
     {
         ifn.Condition.VisitP(this);
@@ -88,15 +107,11 @@ public class AutoVisitor : IVisitorP
     public virtual void VisitFuncDef(FuncDefNode f)
     {
         f.Name.VisitP(this);
-        foreach (var VARIABLE in f.Params)
-        {
-            VARIABLE.VisitP(this);
-        }
+        foreach (var VARIABLE in f.Params) VARIABLE.VisitP(this);
         f.Body.VisitP(this);
-        
     }
 
-    public void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
+    public virtual void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
     {
         DefandStmts.DefinitionsList.VisitP(this);
         DefandStmts.MainProgram.VisitP(this);
@@ -104,10 +119,7 @@ public class AutoVisitor : IVisitorP
 
     public void VisitDefinitionsList(DefinitionsListNode defList)
     {
-        foreach (var x in defList.lst)
-        {
-           x.VisitP(this);
-        }
+        foreach (var x in defList.lst) x.VisitP(this);
     }
 
     public void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)

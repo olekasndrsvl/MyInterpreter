@@ -540,11 +540,18 @@ public partial class CompilerForm : Form
         }
     }
 
+    private void PrepareBeforeCompilation()
+    {
+        outputTextBox.Clear();
+        SymbolTree.Reset();
+        SemanticCheckVisitor.Reset();
+    }
+    
     // Кнопка компиляции
     private void CompileButton_Click(object sender, EventArgs e)
     {
         var lex = new Lexer(codeTextBox.Text);
-        outputTextBox.Clear();
+        PrepareBeforeCompilation();
         try
         {
             var parser = new Parser(lex);
@@ -564,30 +571,31 @@ public partial class CompilerForm : Form
     private async void RunButton_Click(object sender, EventArgs e)
     {
         var lex = new Lexer(codeTextBox.Text);
-        outputTextBox.Clear();
+        PrepareBeforeCompilation();
         try
         {
-            SemanticCheckVisitor.Reset();
-
+            
+            
             var parser = new Parser(lex);
             var progr = parser.MainProgram();
-            SymbolTree.PrintNamespaceTree(SymbolTree.Global);
+            //SymbolTree.PrintNamespaceTree(SymbolTree.Global);
+            //ASTPrinter.PrintAST(progr);
             var sv = new SemanticCheckVisitor();
             progr.VisitP(sv);
+            SymbolTree.PrintNamespaceTree(SymbolTree.Global);
+     
+            //var frame_gen = new FrameSizeVisitor();
+           // progr.VisitP(frame_gen);
 
-            SymbolTree.Reset();
-            var frame_gen = new FrameSizeVisitor();
-            progr.VisitP(frame_gen);
+            //var gen = new ThreeAddressCodeVisitor();
+            //gen.GiveFrameSizes(frame_gen.GetFrameSizes());
+            //progr.VisitP(gen);
 
-            var gen = new ThreeAddressCodeVisitor();
-            gen.GiveFrameSizes(frame_gen.GetFrameSizes());
-            progr.VisitP(gen);
+            //var framesize = frame_gen.GetFrameSizes();
 
-            var framesize = frame_gen.GetFrameSizes();
-
-            VirtualMachine.GiveFrameSize(frame_gen.GetFrameSizes());
-            var code = gen.GetCode();
-            VirtualMachine.LoadProgram(code);
+            //VirtualMachine.GiveFrameSize(frame_gen.GetFrameSizes());
+            //var code = gen.GetCode();
+           // VirtualMachine.LoadProgram(code);
             VirtualMachine.MemoryDump(1000);
 
             var sw = new Stopwatch();
@@ -595,11 +603,11 @@ public partial class CompilerForm : Form
             VirtualMachine.Run();
             sw.Stop();
             
-            foreach (var VARIABLE in frame_gen.GetFrameSizes()) 
-                Console.WriteLine(VARIABLE.Key + " " + VARIABLE.Value);
-
-            foreach (var VARIABLE in gen._currentTempIndexes) 
-                Console.WriteLine(VARIABLE.Key + " " + VARIABLE.Value);
+            // foreach (var VARIABLE in frame_gen.GetFrameSizes()) 
+            //     Console.WriteLine(VARIABLE.Key + " " + VARIABLE.Value);
+            //
+            // foreach (var VARIABLE in gen._currentTempIndexes) 
+            //     Console.WriteLine(VARIABLE.Key + " " + VARIABLE.Value);
 
             Instance.ChangeOutputBoxText($"Programm elapsed time: {sw.Elapsed}\n");
             VirtualMachine.MemoryDump(1000);
