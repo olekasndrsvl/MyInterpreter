@@ -9,7 +9,7 @@ public enum SemanticType
     StringType,
     BadType,
     NoType,
-    AnyType 
+    AnyType
 }
 
 // Типы символов
@@ -189,43 +189,43 @@ public class FunctionInfo(FuncDefNode definition = null)
         foreach (var spec in Specializations)
             if (AreParameterTypesCompatible(spec.ParameterTypes, parameterTypes))
                 return spec;
-        string functionName = "anonymous";
-        
+        var functionName = "anonymous";
+
         // Безопасное получение имени функции
         if (Definition?.Name != null && !string.IsNullOrEmpty(Definition.Name.Name))
-        {
             functionName = Definition.Name.Name;
-        }
         else
-        {
             // Ищем в таблице функций по ссылке на this
             foreach (var entry in SymbolTree.FunctionTable)
-            {
                 if (entry.Value == this)
                 {
                     functionName = entry.Key;
                     break;
                 }
-            }
-        }
-        
+
         //Console.WriteLine($"Created spec for {functionName} with pars: {string.Join(' ',parameterTypes)}");
-        
+
         // Создаем новую специализацию
         var newSpec = new FunctionSpecialization(parameterTypes, this)
         {
             SpecializationId = Specializations.Count
         };
-        
+
         Specializations.Add(newSpec);
-       
-        // Создаем пространство имен для специализации
-        newSpec.NameSpace = SymbolTree.CreateFunctionNamespace(
-            functionName, 
-            newSpec.SpecializationId, 
-            parameterTypes, 
-            Definition?.Params?.Select(x => x.Name).ToArray() ?? Array.Empty<string>()
-        );
+
+        // Для стандартных функций (кроме Main) не создаем пространство имен
+        bool isStandardFunction = SymbolTree.IsStandardFunction(functionName) && functionName != "Main";
+    
+        if (!isStandardFunction)
+        {
+            // Создаем пространство имен только для пользовательских функций
+            newSpec.NameSpace = SymbolTree.CreateFunctionNamespace(
+                functionName,
+                newSpec.SpecializationId,
+                parameterTypes,
+                Definition?.Params?.Select(x => x.Name).ToArray() ?? Array.Empty<string>()
+            );
+        }
 
         return newSpec;
     }
@@ -240,8 +240,6 @@ public class FunctionInfo(FuncDefNode definition = null)
                 return false;
         return true;
     }
-   
-
 }
 
 // Главная таблица символов
@@ -251,7 +249,16 @@ public static class SymbolTree
     {
         Reset();
     }
+    private static readonly HashSet<string> StandardFunctions = new()
+    {
+        "Sqrt", "Sin", "Cos", "Abs", "Round", "Pow", "Max", "Min", 
+        "ToString", "Print", "Main"
+    };
 
+    public static bool IsStandardFunction(string functionName)
+    {
+        return StandardFunctions.Contains(functionName);
+    }
     public static GlobalNameSpace Global { get; private set; }
     public static Dictionary<string, FunctionInfo> FunctionTable { get; private set; }
 
@@ -264,93 +271,73 @@ public static class SymbolTree
 
     private static void InitStandardFunctions()
     {
-        // // Sqrt
-        // var sqrtFunc = new FunctionInfo();
-        // FunctionTable["Sqrt"] = sqrtFunc;
-        // sqrtFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType }, sqrtFunc, SemanticType.DoubleType));
-        // sqrtFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType }, sqrtFunc, SemanticType.DoubleType));
-        //
-        // // Sin
-        // var sinFunc = new FunctionInfo();
-        // FunctionTable["Sin"] = sinFunc;
-        // sinFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType }, sinFunc, SemanticType.DoubleType));
-        // sinFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType }, sinFunc, SemanticType.DoubleType));
-        //
-        //
-        // // Cos
-        // var cosFunc = new FunctionInfo();
-        // FunctionTable["Cos"] = cosFunc;
-        // cosFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType }, cosFunc, SemanticType.DoubleType));
-        // cosFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType }, cosFunc, SemanticType.DoubleType));
-        //
-        //
-        // // Abs
-        // var absFunc = new FunctionInfo();
-        // FunctionTable["Abs"] = absFunc;
-        // absFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType }, absFunc, SemanticType.DoubleType));
-        // absFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType }, absFunc, SemanticType.IntType));
-        //
-        //
-        // // Round
-        // var roundFunc = new FunctionInfo();
-        // FunctionTable["Round"] = roundFunc;
-        // roundFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType }, roundFunc, SemanticType.IntType));
-        //
-        // // Pow
-        // var powFunc = new FunctionInfo();
-        // FunctionTable["Pow"] = powFunc;
-        // powFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType, SemanticType.DoubleType }, powFunc, SemanticType.DoubleType));
-        // powFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType, SemanticType.IntType }, powFunc, SemanticType.DoubleType));
-        //
-        //
-        // // Max
-        // var maxFunc = new FunctionInfo(); 
-        // FunctionTable["Max"] = maxFunc;
-        // maxFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType, SemanticType.DoubleType }, maxFunc, SemanticType.DoubleType));
-        // maxFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType, SemanticType.IntType }, maxFunc, SemanticType.IntType));
-        //
-        //
-        // // Min
-        // var minFunc = new FunctionInfo();
-        // FunctionTable["Min"] = minFunc;
-        // minFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.DoubleType, SemanticType.DoubleType }, minFunc, SemanticType.DoubleType));
-        // minFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.IntType, SemanticType.IntType }, minFunc, SemanticType.IntType));
-        //
-        //
-        // // ToString
-        // var toStringFunc = new FunctionInfo();
-        // FunctionTable["ToString"] = toStringFunc;
-        // toStringFunc.Specializations.Add(new FunctionSpecialization(
-        //     new[] { SemanticType.AnyType }, toStringFunc, SemanticType.StringType));
-        //
-        
+        // Sqrt
+        var sqrtFunc = new FunctionInfo();
+        FunctionTable["Sqrt"] = sqrtFunc;
+        sqrtFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
+        sqrtFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.DoubleType;
+
+        // Sin
+        var sinFunc = new FunctionInfo();
+        FunctionTable["Sin"] = sinFunc;
+        sinFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
+        sinFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.DoubleType;
+
+        // Cos
+        var cosFunc = new FunctionInfo();
+        FunctionTable["Cos"] = cosFunc;
+        cosFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
+        cosFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.DoubleType;
+
+        // Abs
+        var absFunc = new FunctionInfo();
+        FunctionTable["Abs"] = absFunc;
+        absFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
+        absFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.IntType;
+
+        // Round
+        var roundFunc = new FunctionInfo();
+        FunctionTable["Round"] = roundFunc;
+        roundFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.IntType;
+
+        // Pow
+        var powFunc = new FunctionInfo();
+        FunctionTable["Pow"] = powFunc;
+        powFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType, SemanticType.DoubleType }).ReturnType =
+            SemanticType.DoubleType;
+        powFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType, SemanticType.IntType }).ReturnType =
+            SemanticType.DoubleType;
+
+        // Max
+        var maxFunc = new FunctionInfo();
+        FunctionTable["Max"] = maxFunc;
+        maxFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType, SemanticType.DoubleType }).ReturnType =
+            SemanticType.DoubleType;
+        maxFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType, SemanticType.IntType }).ReturnType =
+            SemanticType.IntType;
+
+        // Min
+        var minFunc = new FunctionInfo();
+        FunctionTable["Min"] = minFunc;
+        minFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType, SemanticType.DoubleType }).ReturnType =
+            SemanticType.DoubleType;
+        minFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType, SemanticType.IntType }).ReturnType =
+            SemanticType.IntType;
+
+        // ToString
+        var toStringFunc = new FunctionInfo();
+        FunctionTable["ToString"] = toStringFunc;
+        toStringFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.StringType;
         // Print
         var printFunc = new FunctionInfo();
         FunctionTable["Print"] = printFunc;
         printFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.NoType;
-        
 
 
         // Main
         var mainFunc = new FunctionInfo();
         FunctionTable["Main"] = mainFunc;
         mainFunc.FindOrCreateSpecialization(new[] { SemanticType.NoType }).ReturnType = SemanticType.NoType;
-        
     }
 
     // Создание пространства имен для специализации функции
@@ -362,22 +349,16 @@ public static class SymbolTree
 
         // Добавляем параметры как переменные в это пространство имен
         if (paramNames != null && paramNames.Length > 0)
-        {
             // Проверяем, что у нас достаточно имен для всех параметров
             for (var i = 0; i < paramTypes.Length; i++)
             {
                 var paramName = i < paramNames.Length ? paramNames[i] : $"param{i}";
                 funcNamespace.AddVariable(paramName, paramTypes[i]);
             }
-        }
         else if (paramTypes.Length > 0)
-        {
             // Если имен параметров нет, создаем стандартные имена
             for (var i = 0; i < paramTypes.Length; i++)
-            {
                 funcNamespace.AddVariable($"param{i}", paramTypes[i]);
-            }
-        }
 
         // Связываем пространство имен со специализацией
         if (FunctionTable.TryGetValue(functionName, out var funcInfo) &&
@@ -430,38 +411,33 @@ public static class SymbolTree
         currentNamespace.AddVariable(name, type);
     }
 
-  
+
     // Для отладки - печать дерева пространств имен
     public static void PrintNamespaceTree(NameSpace ns, int indent = 0, bool isLast = true, string prefix = "")
     {
-        string currentPrefix = prefix;
-    
+        var currentPrefix = prefix;
+
         // Добавляем символы для текущего уровня
-        if (indent > 0)
-        {
-            currentPrefix += isLast ? "+-- " : "|--- ";
-        }
-    
+        if (indent > 0) currentPrefix += isLast ? "+-- " : "|--- ";
+
         // Выводим текущее пространство имен
         Console.WriteLine($"{currentPrefix}[NS] {ns.Name} ({ns.GetType().Name})");
-    
+
         // Подготавливаем префикс для следующего уровня
-        string nextPrefix = prefix + (isLast ? "    " : "|   ");
-    
+        var nextPrefix = prefix + (isLast ? "    " : "|   ");
+
         // Выводим переменные внутри пространства
         if (ns.Variables.Count > 0)
-        {
             foreach (var variable in ns.Variables)
             {
-                string varPrefix = nextPrefix + "|   ";
+                var varPrefix = nextPrefix + "|   ";
                 Console.WriteLine($"{varPrefix}|- {variable.Key}: {variable.Value.Type}");
             }
-        }
-    
+
         // Рекурсивно выводим дочерние пространства
-        for (int i = 0; i < ns.Children.Count; i++)
+        for (var i = 0; i < ns.Children.Count; i++)
         {
-            bool childIsLast = i == ns.Children.Count - 1;
+            var childIsLast = i == ns.Children.Count - 1;
             PrintNamespaceTree(ns.Children[i], indent + 1, childIsLast, nextPrefix);
         }
     }

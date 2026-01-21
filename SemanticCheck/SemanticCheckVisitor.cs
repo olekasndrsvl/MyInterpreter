@@ -254,10 +254,13 @@ public class SemanticCheckVisitor : AutoVisitor
             funcSpec.ReturnType = SemanticType.NoType;
         }
 
-      
-
-        node.Body.VisitP(this);
-        _currentNamespace = _currentNamespace.Parent;
+        if(!funcSpec.BodyChecked)
+        {
+            funcSpec.BodyChecked = true;
+            node.Body.VisitP(this);
+            _currentNamespace = _currentNamespace.Parent;
+        }
+        
         if (_currentCheckingFunctionSpecialization.Count > 1)
             _currentCheckingFunctionSpecialization.Pop();
         //Global.Children.Remove(Global.Children.Find(x=>x.Name == node.Name.Name+"_0"));
