@@ -587,17 +587,17 @@ public partial class CompilerForm : Form
             //var frame_gen = new FrameSizeVisitor();
            // progr.VisitP(frame_gen);
 
-            //var gen = new ThreeAddressCodeVisitor();
+            var gen = new ThreeAddressCodeVisitor();
             //gen.GiveFrameSizes(frame_gen.GetFrameSizes());
-            //progr.VisitP(gen);
+            progr.VisitP(gen);
 
             //var framesize = frame_gen.GetFrameSizes();
 
-            //VirtualMachine.GiveFrameSize(frame_gen.GetFrameSizes());
-            //var code = gen.GetCode();
-           // VirtualMachine.LoadProgram(code);
+            VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
+            var code = gen.GetCode();
+            VirtualMachine.LoadProgram(code);
             VirtualMachine.MemoryDump(1000);
-
+            
             var sw = new Stopwatch();
             sw.Start();
             VirtualMachine.Run();

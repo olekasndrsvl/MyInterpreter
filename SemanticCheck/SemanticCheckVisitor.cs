@@ -8,14 +8,14 @@ using static TypeChecker;
 public class SemanticCheckVisitor : AutoVisitor
 {
     // Храним информацию о текущей проверяемой функции для рекурсивных вызовов
-    private static readonly Stack<FunctionSpecialization> _currentCheckingFunctionSpecialization = new();
+    private static readonly Stack<FunctionSpecialization> CurrentCheckingFunctionSpecialization = new();
     private static NameSpace _currentNamespace;
 
     static SemanticCheckVisitor()
     {
         _currentNamespace = SymbolTree.Global;
         if (FunctionTable.TryGetValue("Main", out var functionTable))
-            _currentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
+            CurrentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
         else
             throw new CompilerExceptions.UnExpectedException(
                 "Something went wrong! We have no Main function in function table!");
@@ -24,9 +24,9 @@ public class SemanticCheckVisitor : AutoVisitor
     public static void Reset()
     {
         _currentNamespace = SymbolTree.Global;
-        _currentCheckingFunctionSpecialization.Clear();
+        CurrentCheckingFunctionSpecialization.Clear();
         if (FunctionTable.TryGetValue("Main", out var functionTable))
-            _currentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
+            CurrentCheckingFunctionSpecialization.Push(functionTable.Specializations.First());
         else
             throw new CompilerExceptions.UnExpectedException(
                 "Something went wrong! We have no Main function in function table!");
@@ -36,7 +36,7 @@ public class SemanticCheckVisitor : AutoVisitor
     {
         DefandStmts.DefinitionsList.VisitP(this);
         
-        _currentNamespace = _currentCheckingFunctionSpecialization.Peek().NameSpace;
+        _currentNamespace = CurrentCheckingFunctionSpecialization.Peek().NameSpace;
         
         DefandStmts.MainProgram.VisitP(this);
     }
@@ -44,7 +44,16 @@ public class SemanticCheckVisitor : AutoVisitor
     {
         vass.Expr.VisitP(this);
         var typ = CalcTypeVis(vass.Expr, _currentNamespace);
-        _currentNamespace.AddVariable(vass.Ident.Name,typ);
+        try
+        {
+            _currentNamespace.AddVariable(vass.Ident.Name, typ);
+        }
+        catch (InvalidOperationException ex)
+        {
+            CompilerExceptions.SemanticError(
+                $"Переменная {vass.Ident.Name} уже объявлена!", vass.Ident.Pos);
+        }
+
         vass.Ident.ValueType = typ;
     }
 
@@ -64,7 +73,7 @@ public class SemanticCheckVisitor : AutoVisitor
         var typ = CalcTypeVis(ass.Expr, _currentNamespace);
         ass.Ident.ValueType = typ;
         var variable = _currentNamespace.LookupVariable(ass.Ident.Name);
-        if (_currentCheckingFunctionSpecialization.Count > 0 && variable != null)
+        if (CurrentCheckingFunctionSpecialization.Count > 0 && variable != null)
         {
             if (FunctionTable.ContainsKey(ass.Ident.Name))
                 CompilerExceptions.SemanticError("Переменная не может иметь имя функции!", ass.Ident.Pos);
@@ -183,13 +192,13 @@ public class SemanticCheckVisitor : AutoVisitor
     public override void VisitId(IdNode id)
     {
        
-        if (  _currentNamespace.LookupVariable(id.Name) == null && _currentCheckingFunctionSpecialization.Count == 0)
+        if (  _currentNamespace.LookupVariable(id.Name) == null && CurrentCheckingFunctionSpecialization.Count == 0)
         {
             CompilerExceptions.SemanticError($"Идентификатор {id.Name} не определен", id.Pos);
             return;
         }
 
-        if (_currentCheckingFunctionSpecialization.Count > 0)
+        if (CurrentCheckingFunctionSpecialization.Count > 0)
         {
             if (_currentNamespace.LookupVariable(id.Name)==null)
             {
@@ -228,13 +237,10 @@ public class SemanticCheckVisitor : AutoVisitor
         
         // Добавляем функцию с типами AnyType - конкретные типы будут выведены при вызовах
         var paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
-        var paramNames = FunctionTable[node.Name.Name].Definition.Params.Select(x => x.Name).ToArray();
-        // var funcSpec = new FunctionSpecialization(paramTypes, FunctionTable[node.Name.Name],
-        //    SemanticType.AnyType, paramNames);
-
+       
         var funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
         // Тут проверим тело функции для AnyType
-        _currentCheckingFunctionSpecialization.Push(funcSpec);
+        CurrentCheckingFunctionSpecialization.Push(funcSpec);
         _currentNamespace = funcSpec.NameSpace;
         var returnTypes = new List<SemanticType>();
         CollectReturnTypes(FunctionTable[node.Name.Name].Definition.Body, returnTypes);
@@ -261,9 +267,9 @@ public class SemanticCheckVisitor : AutoVisitor
             _currentNamespace = _currentNamespace.Parent;
         }
         
-        if (_currentCheckingFunctionSpecialization.Count > 1)
-            _currentCheckingFunctionSpecialization.Pop();
-        //Global.Children.Remove(Global.Children.Find(x=>x.Name == node.Name.Name+"_0"));
+        if (CurrentCheckingFunctionSpecialization.Count > 1)
+            CurrentCheckingFunctionSpecialization.Pop();
+      
     }
 
     public override void VisitFuncCall(FuncCallNode f)
@@ -343,7 +349,7 @@ public class SemanticCheckVisitor : AutoVisitor
            
 
             // Обходим тело функции и собираем типы всех return statements
-            _currentCheckingFunctionSpecialization.Push(specialization);
+            CurrentCheckingFunctionSpecialization.Push(specialization);
 
             var returnTypes = new List<SemanticType>();
             CollectReturnTypes(functionDef.Definition.Body, returnTypes);
@@ -367,8 +373,8 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         finally
         {
-            if (_currentCheckingFunctionSpecialization.Count > 1)
-                _currentCheckingFunctionSpecialization.Pop();
+            if (CurrentCheckingFunctionSpecialization.Count > 1)
+                CurrentCheckingFunctionSpecialization.Pop();
         }
         
         
@@ -383,7 +389,7 @@ public class SemanticCheckVisitor : AutoVisitor
                 // Вычисляем тип выражения в return
                 var returnType = CalcTypeVis(returnNode.Expr, _currentNamespace);
                 if (returnTypes.Count == 0)
-                    _currentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
+                    CurrentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
                 returnTypes.Add(returnType);
             }
             else

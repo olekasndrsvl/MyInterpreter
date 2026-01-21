@@ -241,8 +241,10 @@ public class VirtualMachine
     public static void GiveFrameSize(Dictionary<string, int> dict)
     {
         FrameSizes = dict;
-        _currentFrameStack.Push(new Tuple<int, int>(0, FrameSizes["MainFrame"]));
+        
+        _currentFrameStack.Push(new Tuple<int, int>(FrameSizes["GlobalVariables"], FrameSizes["MainFrame"]));
         FrameSizes["print"] = 1;
+        _currentFrameIndex=FrameSizes["GlobalVariables"];
     }
 
     public static void InitializeMemory()

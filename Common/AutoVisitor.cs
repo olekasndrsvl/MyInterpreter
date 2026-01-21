@@ -122,7 +122,7 @@ public class AutoVisitor : IVisitorP
         foreach (var x in defList.lst) x.VisitP(this);
     }
 
-    public void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)
+    public virtual void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)
     {
         vardecl.vass.VisitP(this);
     }

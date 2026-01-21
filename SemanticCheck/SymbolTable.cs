@@ -20,28 +20,19 @@ public enum KindType
 }
 
 // Информация о символе
-public class SymbolInfo
+public class SymbolInfo(string n, KindType k, SemanticType[] pars, SemanticType t)
 {
-    public SymbolInfo(string n, KindType k, SemanticType t)
+    public SymbolInfo(string n, KindType k, SemanticType t) : this(n, k, null, t)
     {
-        Name = n;
-        Kind = k;
-        Type = t;
     }
 
-    public SymbolInfo(string n, KindType k, SemanticType[] pars, SemanticType t)
-    {
-        Name = n;
-        Kind = k;
-        Params = pars;
-        Type = t;
-    }
+    public string Name { get; } = n;
+    public KindType Kind { get; } = k;
+    public SemanticType Type { get; } = t; // для функций - тип возвращаемого значения
+    public SemanticType[] Params { get; } = pars; // для функций - типы параметров
 
-    public string Name { get; }
-    public KindType Kind { get; }
-    public SemanticType Type { get; } // для функций - тип возвращаемого значения
-    public SemanticType[] Params { get; } // для функций - типы параметров
-
+    // Для генерации машинного кода
+    public int VariableAddress = -1;
     public override string ToString()
     {
         return $"{Name} ({Kind}, {Type})";
