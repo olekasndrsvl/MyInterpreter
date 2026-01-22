@@ -169,8 +169,10 @@ public class ThreeAddressCodeVisitor : IVisitorP
     public void VisitBlockNode(BlockNode bin)
     {
         var lastCheckedNamespace = _currentNameSpace;
+        var _oldtempcounter = _tempCounter;
         _currentNameSpace = bin.BlockNameSpace;
         bin.lst.VisitP(this);
+        _tempCounter = _oldtempcounter;
         _currentNameSpace=lastCheckedNamespace;
     }
 
@@ -302,6 +304,10 @@ public class ThreeAddressCodeVisitor : IVisitorP
     {
       
             var varAddress = _currentNameSpace.Variables.Count(x=>x.Value.VariableAddress != -1);
+            if (_currentNameSpace is LightWeightNameSpace)
+            {
+                varAddress += _tempCounter;
+            }
             _currentNameSpace.Variables[ass.Ident.Name].VariableAddress = varAddress;
             var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
              // Оптимизация для констант
@@ -362,19 +368,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         ifn.Condition.VisitP(this);
         var condTemp = _tempCounter - 1;
 
-        if (_currentGeneratingFunctionName.Peek().Equals("MainFrame"))
-        {
-            Code.Add(ThreeAddr.Create(Commands.ifn, condTemp, elseLabel));
-            ifn.ThenStat.VisitP(this);
-            Code.Add(ThreeAddr.Create(Commands.go, endLabel));
-
-            Code.Add(ThreeAddr.Create(Commands.label, elseLabel));
-            ifn.ElseStat?.VisitP(this);
-
-            Code.Add(ThreeAddr.Create(Commands.label, endLabel));
-        }
-        else
-        {
+       
             _function_codes[_currentGeneratingFunctionName.Peek()]
                 .Add(ThreeAddr.Create(Commands.ifn, condTemp, elseLabel, true));
             ifn.ThenStat.VisitP(this);
@@ -384,7 +378,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
             ifn.ElseStat?.VisitP(this);
 
             _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, endLabel));
-        }
+        
     }
 
     public void VisitWhile(WhileNode whn)
@@ -393,23 +387,28 @@ public class ThreeAddressCodeVisitor : IVisitorP
         var endLabel = NewLabel();
 
         Code.Add(ThreeAddr.Create(Commands.label, startLabel));
-
+        
+        
         whn.Condition.VisitP(this);
         var condTemp = _tempCounter - 1;
 
-        Code.Add(ThreeAddr.Create(Commands.ifn, condTemp, endLabel));
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.ifn, condTemp, endLabel));
+        var _oldnamespace = _currentNameSpace;
+        _currentNameSpace = whn.WhileNameSpace;
         whn.Stat.VisitP(this);
-        Code.Add(ThreeAddr.Create(Commands.go, startLabel));
+        _currentNameSpace= _oldnamespace;
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.go, startLabel));
 
-        Code.Add(ThreeAddr.Create(Commands.label, endLabel));
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, endLabel));
     }
 
     public void VisitFor(ForNode forNode)
     {
         var startLabel = NewLabel();
         var endLabel = NewLabel();
-
-      
+        var _oldtempcounter = _tempCounter;
+        var _oldnamespace = _currentNameSpace;
+        _currentNameSpace = forNode.ForNameSpace;
             forNode.Counter.VisitP(this);
 
             _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, startLabel));
@@ -424,7 +423,8 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
             _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.go, startLabel));
             _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, endLabel));
-        
+        _currentNameSpace= _oldnamespace;
+        _tempCounter = _oldtempcounter;
     }
 
 
