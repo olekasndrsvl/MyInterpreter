@@ -86,7 +86,6 @@ public class ThreeAddressCodeVisitor : IVisitorP
     private int _labelCounter;
 
     //private Dictionary<string, int> _variableAddresses = new Dictionary<string, int>();
-    private int _nextVarAddress = 0;
     private int _tempCounter;
     private int _globalVariablesCounter=0;
  
@@ -202,10 +201,11 @@ public class ThreeAddressCodeVisitor : IVisitorP
     {
         var tempIndex = NewTemp();
         var varAddress = GetVariableAddress(id.Name);
+        var isGlobal = _currentNameSpace.LookupVariable(id.Name).IsGlobalVariable;
         var varType = TypeChecker.CalcType(id, _currentNameSpace);
         var command = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
         _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.CreateAssign(command, tempIndex, varAddress, true, true));
+                .Add(ThreeAddr.CreateAssign(command, tempIndex, varAddress, !isGlobal, !isGlobal));
     }
 
     public void VisitAssign(AssignNode ass)
@@ -271,7 +271,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         var loadCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
         
             _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.CreateAssign(loadCommand, currentValueTemp, varAddress));
+                .Add(ThreeAddr.CreateAssign(loadCommand, currentValueTemp, varAddress,true,true));
 
             ass.Expr.VisitP(this);
             var exprResultTemp = _tempCounter - 1;
@@ -282,7 +282,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
             {
                 var convertedTemp = NewTemp();
                 _function_codes[_currentGeneratingFunctionName.Peek()]
-                    .Add(ThreeAddr.CreateConvert(Commands.citr, exprResultTemp, convertedTemp));
+                    .Add(ThreeAddr.CreateConvert(Commands.citr, exprResultTemp, convertedTemp,true,true));
                 exprResultTemp = convertedTemp;
             }
 
@@ -292,14 +292,14 @@ public class ThreeAddressCodeVisitor : IVisitorP
             if (_assignOpTable.TryGetValue((varType, ass.Op), out var operationCommand))
                 _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.CreateBinary(operationCommand,
                     currentValueTemp, exprResultTemp,
-                    operationResultTemp));
+                    operationResultTemp,true,true));
             else
                 throw new InvalidOperationException(
                     $"Unsupported assignment operation '{ass.Op}' for type {varType}");
 
             var storeCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
             _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp));
+                .Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp,true,true));
         
     }
 
@@ -309,7 +309,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
             var varAddress = _currentNameSpace.Variables.Count(x=>x.Value.VariableAddress != -1);
             if (_currentNameSpace is LightWeightNameSpace)
             {
-                varAddress += _tempCounter;
+                varAddress = _tempCounter++;
             }
             _currentNameSpace.Variables[ass.Ident.Name].VariableAddress = varAddress;
             var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
@@ -396,7 +396,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         var startLabel = NewLabel();
         var endLabel = NewLabel();
 
-        Code.Add(ThreeAddr.Create(Commands.label, startLabel));
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, startLabel));
         
         
         whn.Condition.VisitP(this);
@@ -426,7 +426,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
             forNode.Condition.VisitP(this);
             var condTemp = _tempCounter - 1;
             _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.Create(Commands.ifn, condTemp, endLabel));
+                .Add(ThreeAddr.Create(Commands.ifn, condTemp, endLabel,true));
 
             forNode.Stat.VisitP(this);
             forNode.Increment.VisitP(this);
@@ -614,9 +614,9 @@ public class ThreeAddressCodeVisitor : IVisitorP
                     if (exprType == SemanticType.IntType && varType == SemanticType.DoubleType)
                     {
                         var convertedTemp = NewTemp();
-                        Code.Add(
+                        _function_codes[_currentGeneratingFunctionName.Peek()].Add(
                             ThreeAddr.CreateConvert(Commands.citr, exprResultTemp, convertedTemp));
-                        Code
+                        _function_codes[_currentGeneratingFunctionName.Peek()]
                             .Add(ThreeAddr.CreateAssign(Commands.rass, varAddress, convertedTemp));
                     }
                     else

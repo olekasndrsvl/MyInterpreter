@@ -623,8 +623,14 @@ public class VirtualMachine
                 CompilerForm.Instance.ChangeOutputBoxText(value.r.ToString("F6") + '\n');
             else
                 CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString() + '\n');
+            
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
             _currentFrameStack.Pop();
             _currentFrameIndex = _currentFrameStack.Peek().Item1;
+           
         }
         else
         {
