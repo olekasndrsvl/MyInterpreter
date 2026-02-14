@@ -368,8 +368,10 @@ public class SemanticCheckVisitor : AutoVisitor
                 // Если нет return statements, то тип NoType
                 specialization.ReturnType = SemanticType.NoType;
             }
-
-            functionDef.Definition.Body.VisitP(this);
+    
+            FuncDefNode clonedDef = functionDef.Definition.Clone() as FuncDefNode;
+            specialization.Definition = clonedDef;
+            clonedDef.Body.VisitP(this);
         }
         finally
         {

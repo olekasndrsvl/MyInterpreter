@@ -58,7 +58,7 @@ public interface IVisitorP
     void VisitReturn(ReturnNode r);
 }
 
-public class Node
+public abstract class Node : ICloneable
 {
     public Position Pos { get; set; }
 
@@ -71,22 +71,24 @@ public class Node
     {
         v.VisitNode(this);
     }
+
+    public abstract object Clone();
 }
 
-public class DefinitionNode : Node
+public abstract class DefinitionNode : Node
 {
-    public virtual T Visit<T>(IVisitor<T> v)
+    public override T Visit<T>(IVisitor<T> v)
     {
         return v.VisitDefinitionNode(this);
     }
 
-    public virtual void VisitP(IVisitorP v)
+    public override void VisitP(IVisitorP v)
     {
         v.VisitDefinitionNode(this);
     }
 }
 
-public class ExprNode : Node
+public abstract class ExprNode : Node
 {
     public override T Visit<T>(IVisitor<T> v)
     {
@@ -99,7 +101,7 @@ public class ExprNode : Node
     }
 }
 
-public class StatementNode : Node
+public abstract class StatementNode : Node
 {
     public override T Visit<T>(IVisitor<T> v)
     {
@@ -160,6 +162,16 @@ public class BinOpNode : ExprNode
     {
         v.VisitBinOp(this);
     }
+
+    public override object Clone()
+    {
+        return new BinOpNode(
+            (ExprNode)Left.Clone(),
+            (ExprNode)Right.Clone(),
+            Op,
+            Pos?.Clone() as Position
+        );
+    }
 }
 
 public class StatementListNode : StatementNode
@@ -185,6 +197,17 @@ public class StatementListNode : StatementNode
     {
         v.VisitStatementList(this);
     }
+
+    public override object Clone()
+    {
+        var clone = new StatementListNode();
+        foreach (var stmt in lst)
+        {
+            clone.Add((StatementNode)stmt.Clone());
+        }
+        clone.Pos = Pos?.Clone() as Position;
+        return clone;
+    }
 }
 
 public class ExprListNode : Node
@@ -209,6 +232,17 @@ public class ExprListNode : Node
     public override void VisitP(IVisitorP v)
     {
         v.VisitExprList(this);
+    }
+
+    public override object Clone()
+    {
+        var clone = new ExprListNode();
+        foreach (var expr in lst)
+        {
+            clone.Add((ExprNode)expr.Clone());
+        }
+        clone.Pos = Pos?.Clone() as Position;
+        return clone;
     }
 }
 
@@ -236,6 +270,11 @@ public class IntNode : ExprNode
     {
         v.VisitInt(this);
     }
+
+    public override object Clone()
+    {
+        return new IntNode(Val, Pos?.Clone() as Position);
+    }
 }
 
 public class DoubleNode : ExprNode
@@ -261,6 +300,11 @@ public class DoubleNode : ExprNode
     public override void VisitP(IVisitorP v)
     {
         v.VisitDouble(this);
+    }
+
+    public override object Clone()
+    {
+        return new DoubleNode(Val, Pos?.Clone() as Position);
     }
 }
 
@@ -289,6 +333,13 @@ public class IdNode : ExprNode
     {
         v.VisitId(this);
     }
+
+    public override object Clone()
+    {
+        var clone = new IdNode(Name, Pos?.Clone() as Position);
+        clone.ValueType = ValueType; // Копируем тип, если он уже вычислен
+        return clone;
+    }
 }
 
 public class VariableDeclarationNode : DefinitionNode
@@ -309,6 +360,14 @@ public class VariableDeclarationNode : DefinitionNode
     public override void VisitP(IVisitorP v)
     {
         v.VisitVariableDeclarationNode(this);
+    }
+
+    public override object Clone()
+    {
+        return new VariableDeclarationNode(
+            (VarAssignNode)vass.Clone(),
+            Pos?.Clone() as Position
+        );
     }
 }
 
@@ -339,6 +398,15 @@ public class VarAssignNode : StatementNode
     {
         v.VisitVarAssign(this);
     }
+
+    public override object Clone()
+    {
+        return new VarAssignNode(
+            (IdNode)Ident?.Clone(),
+            (ExprNode)Expr?.Clone(),
+            Pos?.Clone() as Position
+        );
+    }
 }
 
 public class AssignNode : StatementNode
@@ -367,6 +435,15 @@ public class AssignNode : StatementNode
     public override void VisitP(IVisitorP v)
     {
         v.VisitAssign(this);
+    }
+
+    public override object Clone()
+    {
+        return new AssignNode(
+            (IdNode)Ident?.Clone(),
+            (ExprNode)Expr?.Clone(),
+            Pos?.Clone() as Position
+        );
     }
 }
 
@@ -399,12 +476,28 @@ public class AssignOpNode : StatementNode
     {
         v.VisitAssignOp(this);
     }
+
+    public override object Clone()
+    {
+        return new AssignOpNode(
+            (IdNode)Ident?.Clone(),
+            (ExprNode)Expr?.Clone(),
+            Op,
+            Pos?.Clone() as Position
+        );
+    }
 }
 
-public class BlockNode(StatementListNode stl) : StatementNode
+public class BlockNode : StatementNode
 {
     public NameSpace BlockNameSpace;
-    public StatementListNode lst = stl;
+    public StatementListNode lst;
+
+    public BlockNode(StatementListNode stl, Position p = null)
+    {
+        lst = stl;
+        Pos = p;
+    }
 
     public void Add(StatementNode st)
     {
@@ -424,6 +517,16 @@ public class BlockNode(StatementListNode stl) : StatementNode
     public override void VisitP(IVisitorP v)
     {
         v.VisitBlockNode(this);
+    }
+
+    public override object Clone()
+    {
+        var clone = new BlockNode(
+            (StatementListNode)lst?.Clone(),
+            Pos?.Clone() as Position
+        );
+        // BlockNameSpace не клонируется - будет создан заново при семантическом анализе
+        return clone;
     }
 }
 
@@ -461,6 +564,18 @@ public class IfNode : StatementNode
     {
         v.VisitIf(this);
     }
+
+    public override object Clone()
+    {
+        var clone = new IfNode(
+            (ExprNode)Condition?.Clone(),
+            (StatementNode)ThenStat?.Clone(),
+            (StatementNode)ElseStat?.Clone(),
+            Pos?.Clone() as Position
+        );
+        // Пространства имен не клонируются - будут созданы заново
+        return clone;
+    }
 }
 
 public class WhileNode : StatementNode
@@ -485,6 +600,17 @@ public class WhileNode : StatementNode
     public override void VisitP(IVisitorP v)
     {
         v.VisitWhile(this);
+    }
+
+    public override object Clone()
+    {
+        var clone = new WhileNode(
+            (ExprNode)Condition?.Clone(),
+            (StatementNode)Stat?.Clone(),
+            Pos?.Clone() as Position
+        );
+        // WhileNameSpace не клонируется
+        return clone;
     }
 }
 
@@ -516,6 +642,19 @@ public class ForNode : StatementNode
     {
         v.VisitFor(this);
     }
+
+    public override object Clone()
+    {
+        var clone = new ForNode(
+            (VarAssignNode)Counter?.Clone(),
+            (ExprNode)Condition?.Clone(),
+            (AssignOpNode)Increment?.Clone(),
+            (StatementNode)Stat?.Clone(),
+            Pos?.Clone() as Position
+        );
+        // ForNameSpace не клонируется
+        return clone;
+    }
 }
 
 public class ProcCallNode : StatementNode
@@ -544,6 +683,15 @@ public class ProcCallNode : StatementNode
     {
         v.VisitProcCall(this);
     }
+
+    public override object Clone()
+    {
+        return new ProcCallNode(
+            (IdNode)Name?.Clone(),
+            (ExprListNode)Pars?.Clone(),
+            Pos?.Clone() as Position
+        );
+    }
 }
 
 public class DefinitionsListNode : DefinitionNode
@@ -569,6 +717,17 @@ public class DefinitionsListNode : DefinitionNode
     {
         v.VisitDefinitionsList(this);
     }
+
+    public override object Clone()
+    {
+        var clone = new DefinitionsListNode();
+        foreach (var def in lst)
+        {
+            clone.Add((DefinitionNode)def.Clone());
+        }
+        clone.Pos = Pos?.Clone() as Position;
+        return clone;
+    }
 }
 
 public class DefinitionsAndStatements : Node
@@ -591,6 +750,15 @@ public class DefinitionsAndStatements : Node
     public override void VisitP(IVisitorP v)
     {
         v.VisitDefinitionsAndStatements(this);
+    }
+
+    public override object Clone()
+    {
+        return new DefinitionsAndStatements(
+            (DefinitionsListNode)DefinitionsList?.Clone(),
+            (StatementNode)MainProgram?.Clone(),
+            Pos?.Clone() as Position
+        );
     }
 }
 
@@ -627,6 +795,20 @@ public class FuncDefNode : DefinitionNode
     {
         v.VisitFuncDef(this);
     }
+
+    public override object Clone()
+    {
+        var clonedParams = Params?.Select(p => (IdNode)p.Clone()).ToList();
+        return new FuncDefNode(
+            (IdNode)Name?.Clone(),
+            clonedParams,
+            (StatementNode)Body?.Clone(),
+            Pos?.Clone() as Position
+        )
+        {
+            ReturnType = ReturnType
+        };
+    }
 }
 
 public class ReturnNode : StatementNode
@@ -652,6 +834,14 @@ public class ReturnNode : StatementNode
     public override void VisitP(IVisitorP v)
     {
         v.VisitReturn(this);
+    }
+
+    public override object Clone()
+    {
+        return new ReturnNode(
+            (ExprNode)Expr?.Clone(),
+            Pos?.Clone() as Position
+        );
     }
 }
 
@@ -684,4 +874,17 @@ public class FuncCallNode : ExprNode
     {
         v.VisitFuncCall(this);
     }
+
+    public override object Clone()
+    {
+        var clone = new FuncCallNode(
+            (IdNode)Name?.Clone(),
+            (ExprListNode)Pars?.Clone(),
+            Pos?.Clone() as Position
+        );
+        clone.ValueType = ValueType;
+        clone.SpecializationId = SpecializationId;
+        return clone;
+    }
 }
+

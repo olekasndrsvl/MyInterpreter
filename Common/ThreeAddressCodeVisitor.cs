@@ -79,7 +79,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
     public Dictionary<string, int> _currentTempIndexes =new Dictionary<string, int>();
     
     private Dictionary<string, int> _frameSizes = new()
-        { {"GlobalVariables",SymbolTree.Global.Variables.Count},{ "MainFrame", 40 }, { "factorial0", 20 }, { "factorial1", 20 } };
+        { {"GlobalVariables",SymbolTree.Global.Variables.Count},{ "MainFrame", 40 }, { "factorial2", 20 }, { "factorial1", 20 } };
 
     private readonly Dictionary<string, List<ThreeAddr>> _function_codes = new();
 
@@ -168,6 +168,9 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
     public void VisitBlockNode(BlockNode bin)
     {
+        if (!_currentNameSpace.Children.Contains(bin.BlockNameSpace))
+            throw new CompilerExceptions.UnExpectedException(
+                $"The namespace {bin.BlockNameSpace.Name} is not child for {_currentNameSpace.Name}! Tree is wrong!");
         var lastCheckedNamespace = _currentNameSpace;
         var _oldtempcounter = _tempCounter;
         _currentNameSpace = bin.BlockNameSpace;
@@ -366,18 +369,25 @@ public class ThreeAddressCodeVisitor : IVisitorP
         var endLabel = NewLabel();
 
         ifn.Condition.VisitP(this);
+        
         var condTemp = _tempCounter - 1;
 
        
-            _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.Create(Commands.ifn, condTemp, elseLabel, true));
-            ifn.ThenStat.VisitP(this);
-            _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.go, endLabel));
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.ifn, condTemp, elseLabel, true));
+        var lastCheckedNameSpace = _currentNameSpace;
+        _currentNameSpace = ifn.ThenNameSpaceSpace;
+        ifn.ThenStat.VisitP(this);
+        _currentNameSpace = lastCheckedNameSpace;
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.go, endLabel));
 
-            _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, elseLabel));
-            ifn.ElseStat?.VisitP(this);
-
-            _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, endLabel));
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, elseLabel));
+        
+        lastCheckedNameSpace = _currentNameSpace;
+        _currentNameSpace = ifn.ElseNameSpace;
+        ifn.ElseStat?.VisitP(this);
+        _currentNameSpace = lastCheckedNameSpace;
+        
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, endLabel));
         
     }
 
@@ -520,9 +530,11 @@ public class ThreeAddressCodeVisitor : IVisitorP
             {
                 x.Value.VariableAddress = i++;
             }
-            
-            SymbolTree.FunctionTable[f.Name.Name].Definition.VisitP(this);
 
+            var lastCheckedNameSpace = _currentNameSpace;
+            _currentNameSpace = specialization.NameSpace;
+            specialization.Definition.VisitP(this);
+            _currentNameSpace = lastCheckedNameSpace;
 
             _tempCounter = _currentTempIndexes[_currentGeneratingFunctionName.Peek()];
         }
@@ -550,6 +562,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
     public void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
     {
         DefandStmts.DefinitionsList.VisitP(this);
+        _currentNameSpace = _currentNameSpace.Children.Find(x => x.Name == "Main_0");
         DefandStmts.MainProgram.VisitP(this);
     }
 
@@ -563,7 +576,10 @@ public class ThreeAddressCodeVisitor : IVisitorP
     public void VisitVariableDeclarationNode(VariableDeclarationNode vardecl)
     {
         var varAddress = _globalVariablesCounter++;
+        
         SymbolTree.Global.Variables[vardecl.vass.Ident.Name].VariableAddress = varAddress;
+        SymbolTree.Global.Variables[vardecl.vass.Ident.Name].IsGlobalVariable = true;
+        
          var varType = TypeChecker.CalcType(vardecl.vass.Ident, _currentNameSpace);
              // Оптимизация для констант
             if (vardecl.vass.Expr is IntNode intNode)

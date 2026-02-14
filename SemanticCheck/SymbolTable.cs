@@ -33,6 +33,7 @@ public class SymbolInfo(string n, KindType k, SemanticType[] pars, SemanticType 
 
     // Для генерации машинного кода
     public int VariableAddress = -1;
+    public bool IsGlobalVariable = false;
     public override string ToString()
     {
         return $"{Name} ({Kind}, {Type})";
@@ -134,6 +135,7 @@ public class FunctionSpecialization
     }
 
     public FunctionInfo Function { get; }
+    public FuncDefNode Definition { get; set; }
     public SemanticType[] ParameterTypes { get; set; }
     public SemanticType ReturnType { get; set; }
     public NameSpace NameSpace { get; set; }

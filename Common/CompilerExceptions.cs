@@ -18,6 +18,10 @@ public class Position
     {
         return $"({Line}, {Column})";
     }
+    public object Clone()
+    {
+        return new Position(Line, Column);
+    }
 }
 
 public class CompilerExceptions
@@ -43,15 +47,24 @@ public class CompilerExceptions
     public static string OutPutError(string prefix, BaseCompilerException e, string[] lines)
     {
         var sb = new StringBuilder();
-        var line = lines[e.Pos.Line - 1];
-        sb.Append(line);
-        sb.Append('\n');
-        for (var i = 0; i < e.Pos.Column - 1; i++)
-            sb.Append(' ');
-        sb.Append('^');
-        sb.Append('\n');
-        sb.Append(prefix + ' ' + e.Pos + ':' + e.Message);
-        sb.Append('\n');
+        
+        if(e.Pos != null)
+        {
+            var line = lines[e.Pos.Line - 1];
+            sb.Append(line);
+            sb.Append('\n');
+            for (var i = 0; i < e.Pos.Column - 1; i++)
+                sb.Append(' ');
+            sb.Append('^');
+            sb.Append('\n');
+            sb.Append(prefix + ' ' + e.Pos + ':' + e.Message);
+            sb.Append('\n');
+        }
+        else
+        {
+            sb.Append(prefix + ' ' + ':' + e.Message);
+        }
+        
         SymbolTree.PrintNamespaceTree(SymbolTree.Global);
         SymbolTree.PrintFunctionTable();
         return sb.ToString();
