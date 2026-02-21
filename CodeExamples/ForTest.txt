@@ -1,0 +1,9 @@
+{
+  var j = 0;
+  for (var i = 0; (i<10); i += 1) do
+  {
+    print(j);
+    j += 1;
+    var u = 0
+  }
+}

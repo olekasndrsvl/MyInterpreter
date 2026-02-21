@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using MyInterpreter.Common;
@@ -500,6 +501,17 @@ public partial class CompilerForm : Form
             outputTextBox.Text = outputTextBox.Text + text;
     }
 
+    public void ClearOutputBoxText()
+    {
+        if (outputTextBox.InvokeRequired)
+        {
+            outputTextBox.Invoke(new Action(ClearOutputBoxText));
+        }
+        else
+        {
+            outputTextBox.Text = "";
+        }
+    }
     private void MainForm_Load(object sender, EventArgs e)
     {
         outputTextBox.BackColor = Color.LightGray;
@@ -579,7 +591,9 @@ public partial class CompilerForm : Form
             var parser = new Parser(lex);
             var progr = parser.MainProgram();
             //SymbolTree.PrintNamespaceTree(SymbolTree.Global);
-            //ASTPrinter.PrintAST(progr);
+            #if DEBUG
+            ASTPrinter.PrintAST(progr);
+            #endif
             var sv = new SemanticCheckVisitor();
             progr.VisitP(sv);
             SymbolTree.PrintNamespaceTree(SymbolTree.Global);
@@ -595,6 +609,10 @@ public partial class CompilerForm : Form
 
             VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
             var code = gen.GetCode();
+            
+            #if DEBUG
+            GetDebugCodeAsMarkdownTable(code,"../../../DebugFile.md");
+            #endif
             VirtualMachine.LoadProgram(code);
             VirtualMachine.MemoryDump(1000);
             
@@ -646,4 +664,87 @@ public partial class CompilerForm : Form
             outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
         }
     }
+    
+    public string GetDebugCodeAsMarkdownTable(List<ThreeAddr> allCode,string filePath = null)
+    {
+        var sb = new StringBuilder();
+        // Заголовки из полей ThreeAddr
+        sb.AppendLine("| # | BValue | IValue | Label | MemIndex | Op1Index | Op2Index | RValue | Type | command | isInDirectAddressing1 | isInDirectAddressing2 | isInDirectAddressing3 |");
+        sb.AppendLine("|---|--------|--------|-------|----------|----------|----------|--------|------|---------|----------------------|----------------------|----------------------|");
+    
+        int index = 0;
+        foreach (var instruction in allCode)
+        {
+            string bValue = instruction.BValue.ToString().ToLower();
+            string iValue = instruction.IValue.ToString();
+            string rValue = instruction.RValue.ToString();
+            string label = instruction.Label ?? "null";
+            string type = instruction.Type.ToString();
+        
+            sb.AppendLine($"| {index} | {bValue} | {iValue} | {label} | {instruction.MemIndex} | {instruction.Op1Index} | {instruction.Op2Index} | {rValue} | {type} | {instruction.command} | {instruction.isInDirectAddressing1} | {instruction.isInDirectAddressing2} | {instruction.isInDirectAddressing3} |");
+        
+            index++;
+        }
+    
+        string result = sb.ToString();
+    
+        // Сохраняем в файл, если указан путь
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            File.WriteAllText(filePath, result);
+        }
+    
+        return result;
+    }
+    
+#if DEBUG
+    private void button1_Click(object sender, EventArgs e)
+    {
+        ChangeOutputBoxText("Debugging started!");
+        var lex = new Lexer(codeTextBox.Text);
+        var parser = new Parser(lex);
+        var progr = parser.MainProgram();
+        //SymbolTree.PrintNamespaceTree(SymbolTree.Global);
+
+        ASTPrinter.PrintAST(progr);
+
+        var sv = new SemanticCheckVisitor();
+        progr.VisitP(sv);
+        SymbolTree.PrintNamespaceTree(SymbolTree.Global);
+     
+        //var frame_gen = new FrameSizeVisitor();
+        // progr.VisitP(frame_gen);
+
+        var gen = new ThreeAddressCodeVisitor();
+        //gen.GiveFrameSizes(frame_gen.GetFrameSizes());
+        progr.VisitP(gen);
+
+        //var framesize = frame_gen.GetFrameSizes();
+
+        VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
+        var code = gen.GetCode();
+
+        GetDebugCodeAsMarkdownTable(code,"../../../DebugFile.md");
+
+        VirtualMachine.LoadProgram(code);
+        VirtualMachine.StartDebug();
+    }
+
+    private void button2_Click(object sender, EventArgs e)
+    {
+        VirtualMachine.Continue();
+    }
+    private void button3_Click(object sender, EventArgs e)
+    {
+        ClearOutputBoxText();
+        VirtualMachine.StepNext();
+        
+    }
+
+    private void button4_Click(object sender, EventArgs e)
+    {
+        ChangeOutputBoxText("Debugging stopped!");
+        VirtualMachine.Stop();
+    }
+#endif
 }

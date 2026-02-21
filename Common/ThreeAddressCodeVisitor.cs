@@ -1,4 +1,5 @@
-﻿using MyInterpreter.SemanticCheck;
+﻿using System.Text;
+using MyInterpreter.SemanticCheck;
 
 namespace MyInterpreter.Common;
 
@@ -205,14 +206,15 @@ public class ThreeAddressCodeVisitor : IVisitorP
         var varType = TypeChecker.CalcType(id, _currentNameSpace);
         var command = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
         _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.CreateAssign(command, tempIndex, varAddress, !isGlobal, !isGlobal));
+                .Add(ThreeAddr.CreateAssign(command, tempIndex, varAddress, true, !isGlobal));
     }
 
     public void VisitAssign(AssignNode ass)
     {
         var varAddress = GetVariableAddress(ass.Ident.Name);
+        var isGlobal =  _currentNameSpace.LookupVariable(ass.Ident.Name).IsGlobalVariable;
         var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
-
+    
         
          // Оптимизация для констант
             if (ass.Expr is IntNode intNode)
@@ -220,15 +222,15 @@ public class ThreeAddressCodeVisitor : IVisitorP
                 if (varType == SemanticType.DoubleType)
                     // int -> double: создаем double константу напрямую
                     _function_codes[_currentGeneratingFunctionName.Peek()]
-                        .Add(ThreeAddr.CreateConst(Commands.rcass, varAddress, (double)intNode.Val, true));
+                        .Add(ThreeAddr.CreateConst(Commands.rcass, varAddress, (double)intNode.Val, !isGlobal));
                 else
                     _function_codes[_currentGeneratingFunctionName.Peek()]
-                        .Add(ThreeAddr.CreateConst(Commands.icass, varAddress, intNode.Val, true));
+                        .Add(ThreeAddr.CreateConst(Commands.icass, varAddress, intNode.Val, !isGlobal));
             }
             else if (ass.Expr is DoubleNode doubleNode)
             {
                 _function_codes[_currentGeneratingFunctionName.Peek()]
-                    .Add(ThreeAddr.CreateConst(Commands.rcass, varAddress, doubleNode.Val, true));
+                    .Add(ThreeAddr.CreateConst(Commands.rcass, varAddress, doubleNode.Val, !isGlobal));
             }
             else
             {
@@ -240,7 +242,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
                 {
                     var command = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
                     _function_codes[_currentGeneratingFunctionName.Peek()]
-                        .Add(ThreeAddr.CreateAssign(command, varAddress, exprResultTemp, true, true));
+                        .Add(ThreeAddr.CreateAssign(command, varAddress, exprResultTemp, !isGlobal, true));
                 }
                 else
                 {
@@ -250,7 +252,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
                         _function_codes[_currentGeneratingFunctionName.Peek()].Add(
                             ThreeAddr.CreateConvert(Commands.citr, exprResultTemp, convertedTemp, true, true));
                         _function_codes[_currentGeneratingFunctionName.Peek()]
-                            .Add(ThreeAddr.CreateAssign(Commands.rass, varAddress, convertedTemp, true, true));
+                            .Add(ThreeAddr.CreateAssign(Commands.rass, varAddress, convertedTemp, !isGlobal, true));
                     }
                     else
                     {
@@ -266,12 +268,13 @@ public class ThreeAddressCodeVisitor : IVisitorP
     {
         var varAddress = GetVariableAddress(ass.Ident.Name);
         var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
-
+        var isGlobal =  _currentNameSpace.LookupVariable(ass.Ident.Name).IsGlobalVariable;
+        
         var currentValueTemp = NewTemp();
         var loadCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
         
             _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.CreateAssign(loadCommand, currentValueTemp, varAddress,true,true));
+                .Add(ThreeAddr.CreateAssign(loadCommand, currentValueTemp, varAddress,true,!isGlobal));
 
             ass.Expr.VisitP(this);
             var exprResultTemp = _tempCounter - 1;
@@ -292,14 +295,14 @@ public class ThreeAddressCodeVisitor : IVisitorP
             if (_assignOpTable.TryGetValue((varType, ass.Op), out var operationCommand))
                 _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.CreateBinary(operationCommand,
                     currentValueTemp, exprResultTemp,
-                    operationResultTemp,true,true));
+                    operationResultTemp,true,true,true));
             else
                 throw new InvalidOperationException(
                     $"Unsupported assignment operation '{ass.Op}' for type {varType}");
 
             var storeCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
             _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp,true,true));
+                .Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp,!isGlobal,true));
         
     }
 
@@ -402,7 +405,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
         whn.Condition.VisitP(this);
         var condTemp = _tempCounter - 1;
 
-        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.ifn, condTemp, endLabel));
+        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.ifn, condTemp, endLabel, true));
         var _oldnamespace = _currentNameSpace;
         _currentNameSpace = whn.WhileNameSpace;
         whn.Stat.VisitP(this);
@@ -726,4 +729,6 @@ public class ThreeAddressCodeVisitor : IVisitorP
             if (Code[i].command == Commands.label)
                 LabelAddresses[Code[i].Label] = i;
     }
+    
+   
 }

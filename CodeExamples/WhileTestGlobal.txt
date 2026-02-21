@@ -1,0 +1,9 @@
+var jk = 124;
+{
+  var x = 1.2;
+  while x<10 do
+  {
+    x = x+1;
+  };
+print(x);
+}

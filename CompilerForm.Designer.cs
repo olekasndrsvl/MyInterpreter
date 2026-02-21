@@ -13,178 +13,240 @@ partial class CompilerForm
                 }
                 base.Dispose(disposing);
             }
-    
+
+            /// <summary>
+            /// Required method for Designer support - do not modify
+            /// the contents of this method with the code editor.
+            /// </summary>
             private void InitializeComponent()
             {
-                this.menuStrip = new System.Windows.Forms.MenuStrip();
-                this.fileMenu = new System.Windows.Forms.ToolStripMenuItem();
-                this.newMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-                this.openMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-                this.saveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-                this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-                this.exitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-                this.compileButton = new System.Windows.Forms.Button();
-                this.runButton = new System.Windows.Forms.Button();
-                this.refactorButton = new System.Windows.Forms.Button();
-                this.splitContainer = new System.Windows.Forms.SplitContainer();
-                this.codeTextBox = new System.Windows.Forms.RichTextBox();
-                this.outputTextBox = new System.Windows.Forms.RichTextBox();
-                this.menuStrip.SuspendLayout();
-                ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).BeginInit();
-                this.splitContainer.Panel1.SuspendLayout();
-                this.splitContainer.Panel2.SuspendLayout();
-                this.splitContainer.SuspendLayout();
-                this.SuspendLayout();
+                menuStrip = new System.Windows.Forms.MenuStrip();
+                fileMenu = new System.Windows.Forms.ToolStripMenuItem();
+                newMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+                openMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+                saveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+                toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+                exitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+                compileButton = new System.Windows.Forms.Button();
+                runButton = new System.Windows.Forms.Button();
+                refactorButton = new System.Windows.Forms.Button();
+                splitContainer = new System.Windows.Forms.SplitContainer();
+                codeTextBox = new System.Windows.Forms.RichTextBox();
+                outputTextBox = new System.Windows.Forms.RichTextBox();
+                button1 = new System.Windows.Forms.Button();
+                button2 = new System.Windows.Forms.Button();
+                button3 = new System.Windows.Forms.Button();
+                button4 = new System.Windows.Forms.Button();
+                menuStrip.SuspendLayout();
+                ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
+                splitContainer.Panel1.SuspendLayout();
+                splitContainer.Panel2.SuspendLayout();
+                splitContainer.SuspendLayout();
+                SuspendLayout();
                 // 
                 // menuStrip
                 // 
-                this.menuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.fileMenu});
-                this.menuStrip.Location = new System.Drawing.Point(0, 0);
-                this.menuStrip.Name = "menuStrip";
-                this.menuStrip.Size = new System.Drawing.Size(800, 24);
-                this.menuStrip.TabIndex = 0;
+                menuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { fileMenu });
+                menuStrip.Location = new System.Drawing.Point(0, 0);
+                menuStrip.Name = "menuStrip";
+                menuStrip.Padding = new System.Windows.Forms.Padding(8, 3, 0, 3);
+                menuStrip.Size = new System.Drawing.Size(1067, 29);
+                menuStrip.TabIndex = 0;
                 // 
                 // fileMenu
                 // 
-                this.fileMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.newMenuItem,
-                this.openMenuItem,
-                this.saveMenuItem,
-                this.toolStripSeparator1,
-                this.exitMenuItem});
-                this.fileMenu.Name = "fileMenu";
-                this.fileMenu.Size = new System.Drawing.Size(48, 20);
-                this.fileMenu.Text = "Файл";
+                fileMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { newMenuItem, openMenuItem, saveMenuItem, toolStripSeparator1, exitMenuItem });
+                fileMenu.Name = "fileMenu";
+                fileMenu.Size = new System.Drawing.Size(53, 23);
+                fileMenu.Text = "Файл";
                 // 
                 // newMenuItem
                 // 
-                this.newMenuItem.Name = "newMenuItem";
-                this.newMenuItem.Size = new System.Drawing.Size(180, 22);
-                this.newMenuItem.Text = "Новый";
-                this.newMenuItem.Click += new System.EventHandler(this.NewMenuItem_Click);
+                newMenuItem.Name = "newMenuItem";
+                newMenuItem.Size = new System.Drawing.Size(145, 24);
+                newMenuItem.Text = "Новый";
+                newMenuItem.Click += NewMenuItem_Click;
                 // 
                 // openMenuItem
                 // 
-                this.openMenuItem.Name = "openMenuItem";
-                this.openMenuItem.Size = new System.Drawing.Size(180, 22);
-                this.openMenuItem.Text = "Открыть";
-                this.openMenuItem.Click += new System.EventHandler(this.OpenMenuItem_Click);
+                openMenuItem.Name = "openMenuItem";
+                openMenuItem.Size = new System.Drawing.Size(145, 24);
+                openMenuItem.Text = "Открыть";
+                openMenuItem.Click += OpenMenuItem_Click;
                 // 
                 // saveMenuItem
                 // 
-                this.saveMenuItem.Name = "saveMenuItem";
-                this.saveMenuItem.Size = new System.Drawing.Size(180, 22);
-                this.saveMenuItem.Text = "Сохранить";
-                this.saveMenuItem.Click += new System.EventHandler(this.SaveMenuItem_Click);
+                saveMenuItem.Name = "saveMenuItem";
+                saveMenuItem.Size = new System.Drawing.Size(145, 24);
+                saveMenuItem.Text = "Сохранить";
+                saveMenuItem.Click += SaveMenuItem_Click;
                 // 
                 // toolStripSeparator1
                 // 
-                this.toolStripSeparator1.Name = "toolStripSeparator1";
-                this.toolStripSeparator1.Size = new System.Drawing.Size(177, 6);
+                toolStripSeparator1.Name = "toolStripSeparator1";
+                toolStripSeparator1.Size = new System.Drawing.Size(142, 6);
                 // 
                 // exitMenuItem
                 // 
-                this.exitMenuItem.Name = "exitMenuItem";
-                this.exitMenuItem.Size = new System.Drawing.Size(180, 22);
-                this.exitMenuItem.Text = "Выход";
-                //this.exitMenuItem.Click += new System.EventHandler(this.ExitMenuItem_Click);
+                exitMenuItem.Name = "exitMenuItem";
+                exitMenuItem.Size = new System.Drawing.Size(145, 24);
+                exitMenuItem.Text = "Выход";
                 // 
                 // compileButton
                 // 
-                this.compileButton.Location = new System.Drawing.Point(12, 30);
-                this.compileButton.Name = "compileButton";
-                this.compileButton.Size = new System.Drawing.Size(100, 30);
-                this.compileButton.TabIndex = 1;
-                this.compileButton.Text = "Компиляция";
-                this.compileButton.UseVisualStyleBackColor = true;
-                this.compileButton.Click += new System.EventHandler(this.CompileButton_Click);
+                compileButton.Location = new System.Drawing.Point(16, 44);
+                compileButton.Margin = new System.Windows.Forms.Padding(4);
+                compileButton.Name = "compileButton";
+                compileButton.Size = new System.Drawing.Size(133, 44);
+                compileButton.TabIndex = 1;
+                compileButton.Text = "Компиляция";
+                compileButton.UseVisualStyleBackColor = true;
+                compileButton.Click += CompileButton_Click;
                 // 
                 // runButton
                 // 
-                this.runButton.Location = new System.Drawing.Point(118, 30);
-                this.runButton.Name = "runButton";
-                this.runButton.Size = new System.Drawing.Size(100, 30);
-                this.runButton.TabIndex = 2;
-                this.runButton.Text = "Запуск";
-                this.runButton.UseVisualStyleBackColor = true;
-                this.runButton.Click += new System.EventHandler(this.RunButton_Click);
+                runButton.Location = new System.Drawing.Point(157, 44);
+                runButton.Margin = new System.Windows.Forms.Padding(4);
+                runButton.Name = "runButton";
+                runButton.Size = new System.Drawing.Size(133, 44);
+                runButton.TabIndex = 2;
+                runButton.Text = "Запуск";
+                runButton.UseVisualStyleBackColor = true;
+                runButton.Click += RunButton_Click;
                 // 
                 // refactorButton
                 // 
-                this.refactorButton.Location = new System.Drawing.Point(224, 30);
-                this.refactorButton.Name = "refactorButton";
-                this.refactorButton.Size = new System.Drawing.Size(100, 30);
-                this.refactorButton.TabIndex = 3;
-                this.refactorButton.Text = "Форматирование кода";
-                this.refactorButton.UseVisualStyleBackColor = true;
-                this.refactorButton.Click += new System.EventHandler(this.RefactorButton_Click);
+                refactorButton.Location = new System.Drawing.Point(299, 44);
+                refactorButton.Margin = new System.Windows.Forms.Padding(4);
+                refactorButton.Name = "refactorButton";
+                refactorButton.Size = new System.Drawing.Size(133, 44);
+                refactorButton.TabIndex = 3;
+                refactorButton.Text = "Форматирование кода";
+                refactorButton.UseVisualStyleBackColor = true;
+                refactorButton.Click += RefactorButton_Click;
                 // 
                 // splitContainer
                 // 
-                this.splitContainer.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-                | System.Windows.Forms.AnchorStyles.Left) 
-                | System.Windows.Forms.AnchorStyles.Right)));
-                this.splitContainer.Location = new System.Drawing.Point(12, 70);
-                this.splitContainer.Name = "splitContainer";
-                this.splitContainer.Orientation = System.Windows.Forms.Orientation.Horizontal;
+                splitContainer.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right));
+                splitContainer.Location = new System.Drawing.Point(16, 102);
+                splitContainer.Margin = new System.Windows.Forms.Padding(4);
+                splitContainer.Name = "splitContainer";
+                splitContainer.Orientation = System.Windows.Forms.Orientation.Horizontal;
                 // 
                 // splitContainer.Panel1
                 // 
-                this.splitContainer.Panel1.Controls.Add(this.codeTextBox);
+                splitContainer.Panel1.Controls.Add(codeTextBox);
                 // 
                 // splitContainer.Panel2
                 // 
-                this.splitContainer.Panel2.Controls.Add(this.outputTextBox);
-                this.splitContainer.Size = new System.Drawing.Size(776, 368);
-                this.splitContainer.SplitterDistance = 258;
-                this.splitContainer.TabIndex = 4;
+                splitContainer.Panel2.Controls.Add(outputTextBox);
+                splitContainer.Size = new System.Drawing.Size(1035, 538);
+                splitContainer.SplitterDistance = 377;
+                splitContainer.SplitterWidth = 6;
+                splitContainer.TabIndex = 4;
                 // 
                 // codeTextBox
                 // 
-                this.codeTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
-                this.codeTextBox.Font = new System.Drawing.Font("Consolas", 10F);
-                this.codeTextBox.Location = new System.Drawing.Point(0, 0);
-                this.codeTextBox.Name = "codeTextBox";
-                this.codeTextBox.Size = new System.Drawing.Size(776, 258);
-                this.codeTextBox.TabIndex = 0;
-                this.codeTextBox.Text = "";
+                codeTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
+                codeTextBox.Font = new System.Drawing.Font("Consolas", 10F);
+                codeTextBox.Location = new System.Drawing.Point(0, 0);
+                codeTextBox.Margin = new System.Windows.Forms.Padding(4);
+                codeTextBox.Name = "codeTextBox";
+                codeTextBox.Size = new System.Drawing.Size(1035, 377);
+                codeTextBox.TabIndex = 0;
+                codeTextBox.Text = "";
                 // 
                 // outputTextBox
                 // 
-                this.outputTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
-                this.outputTextBox.Font = new System.Drawing.Font("Consolas", 10F);
-                this.outputTextBox.Location = new System.Drawing.Point(0, 0);
-                this.outputTextBox.Name = "outputTextBox";
-                this.outputTextBox.Size = new System.Drawing.Size(776, 106);
-                this.outputTextBox.TabIndex = 0;
-                this.outputTextBox.Text = "";
+                outputTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
+                outputTextBox.Font = new System.Drawing.Font("Consolas", 10F);
+                outputTextBox.Location = new System.Drawing.Point(0, 0);
+                outputTextBox.Margin = new System.Windows.Forms.Padding(4);
+                outputTextBox.Name = "outputTextBox";
+                outputTextBox.Size = new System.Drawing.Size(1035, 155);
+                outputTextBox.TabIndex = 0;
+                outputTextBox.Text = "";
+                
+                #if DEBUG
                 // 
-                // MainForm
+                // button1
                 // 
-                this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-                this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-                this.ClientSize = new System.Drawing.Size(800, 450);
-                this.Controls.Add(this.splitContainer);
-                this.Controls.Add(this.refactorButton);
-                this.Controls.Add(this.runButton);
-                this.Controls.Add(this.compileButton);
-                this.Controls.Add(this.menuStrip);
-                this.MainMenuStrip = this.menuStrip;
-                this.Name = "MainForm";
-                this.Text = "Компилятор";
-                //this.Load += new System.EventHandler(this.MainForm_Load);
-                this.menuStrip.ResumeLayout(false);
-                this.menuStrip.PerformLayout();
-                this.splitContainer.Panel1.ResumeLayout(false);
-                this.splitContainer.Panel2.ResumeLayout(false);
-                ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).EndInit();
-                this.splitContainer.ResumeLayout(false);
-                this.ResumeLayout(false);
-                this.PerformLayout();
-    
+                
+                button1.Location = new System.Drawing.Point(569, 44);
+                button1.Margin = new System.Windows.Forms.Padding(4);
+                button1.Name = "button1";
+                button1.Size = new System.Drawing.Size(133, 44);
+                button1.TabIndex = 5;
+                button1.Text = "VM DEBUG";
+                button1.UseVisualStyleBackColor = true;
+                button1.Click += button1_Click;
+                // 
+                // button2
+                // 
+                button2.Location = new System.Drawing.Point(710, 44);
+                button2.Margin = new System.Windows.Forms.Padding(4);
+                button2.Name = "button2";
+                button2.Size = new System.Drawing.Size(82, 44);
+                button2.TabIndex = 6;
+                button2.Text = "RUN";
+                button2.UseVisualStyleBackColor = true;
+                button2.Click += button2_Click;
+                // 
+                // button3
+                // 
+                button3.Location = new System.Drawing.Point(800, 44);
+                button3.Margin = new System.Windows.Forms.Padding(4);
+                button3.Name = "button3";
+                button3.Size = new System.Drawing.Size(82, 44);
+                button3.TabIndex = 7;
+                button3.Text = "STEP";
+                button3.UseVisualStyleBackColor = true;
+                button3.Click += button3_Click;
+                // 
+                // button4
+                // 
+                button4.Location = new System.Drawing.Point(890, 44);
+                button4.Margin = new System.Windows.Forms.Padding(4);
+                button4.Name = "button4";
+                button4.Size = new System.Drawing.Size(82, 44);
+                button4.TabIndex = 8;
+                button4.Text = "STOP";
+                button4.UseVisualStyleBackColor = true;
+                button4.Click += button4_Click;
+                #endif
+                // 
+                // CompilerForm
+                // 
+                AutoScaleDimensions = new System.Drawing.SizeF(8F, 19F);
+                AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+                ClientSize = new System.Drawing.Size(1067, 658);
+                Controls.Add(button4);
+                Controls.Add(button3);
+                Controls.Add(button2);
+                Controls.Add(button1);
+                Controls.Add(splitContainer);
+                Controls.Add(refactorButton);
+                Controls.Add(runButton);
+                Controls.Add(compileButton);
+                Controls.Add(menuStrip);
+                MainMenuStrip = menuStrip;
+                Margin = new System.Windows.Forms.Padding(4);
+                Text = "Компилятор";
+                menuStrip.ResumeLayout(false);
+                menuStrip.PerformLayout();
+                splitContainer.Panel1.ResumeLayout(false);
+                splitContainer.Panel2.ResumeLayout(false);
+                ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
+                splitContainer.ResumeLayout(false);
+                ResumeLayout(false);
+                PerformLayout();
             }
-    
+
+            private System.Windows.Forms.Button button1;
+            private System.Windows.Forms.Button button2;
+            private System.Windows.Forms.Button button3;
+            private System.Windows.Forms.Button button4;
+
             //#endregion
     
             private MenuStrip menuStrip;
@@ -196,7 +258,7 @@ partial class CompilerForm
             private ToolStripMenuItem exitMenuItem;
             private Button compileButton;
             private Button runButton;
-            private Button refactorButton;
+            private System.Windows.Forms.Button refactorButton;
             private SplitContainer splitContainer;
             private RichTextBox codeTextBox;
             private RichTextBox outputTextBox;

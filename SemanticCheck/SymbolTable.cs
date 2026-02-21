@@ -330,7 +330,7 @@ public static class SymbolTree
         // Main
         var mainFunc = new FunctionInfo();
         FunctionTable["Main"] = mainFunc;
-        mainFunc.FindOrCreateSpecialization(new[] { SemanticType.NoType }).ReturnType = SemanticType.NoType;
+        mainFunc.FindOrCreateSpecialization(Array.Empty<SemanticType>()).ReturnType = SemanticType.NoType;
     }
 
     // Создание пространства имен для специализации функции

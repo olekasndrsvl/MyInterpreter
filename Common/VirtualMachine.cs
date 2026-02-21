@@ -106,7 +106,7 @@ public class ThreeAddr
 
     public static ThreeAddr CreateConst(Commands comm, int memIndex, double rvalue, bool isInDirectAddress = false)
     {
-        return new ThreeAddr { command = comm, MemIndex = memIndex, RValue = rvalue, isInDirectAddressing1 = false };
+        return new ThreeAddr { command = comm, MemIndex = memIndex, RValue = rvalue, isInDirectAddressing1 = isInDirectAddress };
     }
 
     // Для команд с меткой (label, go)
@@ -645,6 +645,86 @@ public class VirtualMachine
         LoadProgram(program);
         Run();
     }
+    
+    
+  
+    
+#if DEBUG
+    private static bool _isPaused = false;
+    private static bool _isRunning = false;
+    public static bool DebugMode { get; set; } = false;
+    
+    // 1. Запуск с отладкой по шагам
+    public static void StartDebug()
+    {
+        if (_program == null)
+            throw new InvalidOperationException("Программа не загружена!");
+            
+        _programCounter = 0;
+        _isPaused = true;
+        _isRunning = true;
+        
+        // Очищаем вывод при старте отладки
+        CompilerForm.Instance?.ClearOutputBoxText();
+    }
+    
+    // 2. Следующий шаг
+    public static void StepNext()
+    {
+        if (!_isPaused || !_isRunning || _program == null)
+            return;
+            
+        if (_programCounter < _program.Length)
+        {
+            var command = _program[_programCounter];
+            ExecuteCommand(command);
+            
+            // Показываем дамп памяти после каждой команды
+            MemoryDump(1000);
+            
+            if (command.command == Commands.stop)
+            {
+                _isPaused = false;
+                _isRunning = false;
+            }
+            else
+            {
+                _programCounter++;
+            }
+        }
+    }
+    
+    // 3. Продолжить в обычном режиме
+    public static void Continue()
+    {
+        if (!_isPaused || !_isRunning || _program == null)
+            return;
+            
+        _isPaused = false;
+        
+        while (_isRunning && _programCounter < _program.Length && !_isPaused)
+        {
+            var command = _program[_programCounter];
+            ExecuteCommand(command);
+            
+            if (command.command == Commands.stop)
+            {
+                _isRunning = false;
+                break;
+            }
+            
+            _programCounter++;
+        }
+    }
+    
+    // 4. Стоп (остановка выполнения)
+    public static void Stop()
+    {
+        _isPaused = false;
+        _isRunning = false;
+        _programCounter = 0;
+    }
+    #endif
 }
 
 public enum VarType
