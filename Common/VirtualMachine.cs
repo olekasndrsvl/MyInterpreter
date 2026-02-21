@@ -315,24 +315,14 @@ public class VirtualMachine
         var TOLERANCE = double.Epsilon;
         switch (cmd.command)
         {
-            case Commands.icass when cmd.IValue != 0:
+            case Commands.icass:
                 SetIntValue(cmd.MemIndex, cmd.isInDirectAddressing1, cmd.IValue);
                 break;
-
-            case Commands.icass:
-                SetIntValue(cmd.MemIndex, cmd.isInDirectAddressing1,
-                    GetIntValue(cmd.Op1Index, cmd.isInDirectAddressing2));
-                break;
-
-            case Commands.rcass when cmd.RValue != 0.0:
+         
+            case Commands.rcass:
                 SetRealValue(cmd.MemIndex, cmd.isInDirectAddressing1, cmd.RValue);
                 break;
-
-            case Commands.rcass:
-                SetRealValue(cmd.MemIndex, cmd.isInDirectAddressing1,
-                    GetRealValue(cmd.Op1Index, cmd.isInDirectAddressing2));
-                break;
-
+            
             case Commands.bcass:
                 SetBoolValue(cmd.MemIndex, cmd.isInDirectAddressing1,
                     GetBoolValue(cmd.Op1Index, cmd.isInDirectAddressing2));
@@ -664,8 +654,6 @@ public class VirtualMachine
         _isPaused = true;
         _isRunning = true;
         
-        // Очищаем вывод при старте отладки
-        CompilerForm.Instance?.ClearOutputBoxText();
     }
     
     // 2. Следующий шаг
@@ -677,6 +665,13 @@ public class VirtualMachine
         if (_programCounter < _program.Length)
         {
             var command = _program[_programCounter];
+            string bValue = command.BValue.ToString().ToLower();
+            string iValue = command.IValue.ToString();
+            string rValue = command.RValue.ToString();
+            string label = command.Label ?? "null";
+            string type = command.Type.ToString();
+            CompilerForm.Instance.ChangeOutputBoxText($" | {bValue} | {iValue} | {label} | {command.MemIndex} | {command.Op1Index} | {command.Op2Index} | {rValue} | {type} | {command.command} | {command.isInDirectAddressing1} | {command.isInDirectAddressing2} | {command.isInDirectAddressing3} | \n");
+            Console.WriteLine("CurentFrameIndex: " + _currentFrameIndex);
             ExecuteCommand(command);
             
             // Показываем дамп памяти после каждой команды

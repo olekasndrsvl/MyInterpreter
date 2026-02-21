@@ -700,7 +700,9 @@ public partial class CompilerForm : Form
 #if DEBUG
     private void button1_Click(object sender, EventArgs e)
     {
+        ClearOutputBoxText();
         ChangeOutputBoxText("Debugging started!");
+        PrepareBeforeCompilation();
         var lex = new Lexer(codeTextBox.Text);
         var parser = new Parser(lex);
         var progr = parser.MainProgram();
