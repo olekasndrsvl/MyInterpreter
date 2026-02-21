@@ -211,6 +211,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
     public void VisitAssign(AssignNode ass)
     {
+        var _old_tempcounter = _tempCounter;
         var varAddress = GetVariableAddress(ass.Ident.Name);
         var isGlobal =  _currentNameSpace.LookupVariable(ass.Ident.Name).IsGlobalVariable;
         var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
@@ -261,11 +262,14 @@ public class ThreeAddressCodeVisitor : IVisitorP
                     }
                 }
             }
-        
+
+            _tempCounter = _old_tempcounter;
+
     }
 
     public void VisitAssignOp(AssignOpNode ass)
     {
+        var _old_tempcounter = _tempCounter;
         var varAddress = GetVariableAddress(ass.Ident.Name);
         var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
         var isGlobal =  _currentNameSpace.LookupVariable(ass.Ident.Name).IsGlobalVariable;
@@ -303,12 +307,13 @@ public class ThreeAddressCodeVisitor : IVisitorP
             var storeCommand = varType == SemanticType.DoubleType ? Commands.rass : Commands.iass;
             _function_codes[_currentGeneratingFunctionName.Peek()]
                 .Add(ThreeAddr.CreateAssign(storeCommand, varAddress, operationResultTemp,!isGlobal,true));
-        
+            _tempCounter = _old_tempcounter;
+
     }
 
     public void VisitVarAssign(VarAssignNode ass)
     {
-      
+           
             var varAddress = _currentNameSpace.Variables.Count(x=>x.Value.VariableAddress != -1);
             if (_currentNameSpace is LightWeightNameSpace)
             {
@@ -316,6 +321,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
             }
             _currentNameSpace.Variables[ass.Ident.Name].VariableAddress = varAddress;
             var varType = TypeChecker.CalcType(ass.Ident, _currentNameSpace);
+            var _old_tempcounter = _tempCounter;
              // Оптимизация для констант
             if (ass.Expr is IntNode intNode)
             {
@@ -361,13 +367,14 @@ public class ThreeAddressCodeVisitor : IVisitorP
                     }
                 }
             }
-          
-        
+
+            _tempCounter = _old_tempcounter;
     }
 
 
     public void VisitIf(IfNode ifn)
     {
+        var _old_tempcounter = _tempCounter;
         var elseLabel = NewLabel();
         var endLabel = NewLabel();
 
@@ -377,6 +384,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
        
         _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.ifn, condTemp, elseLabel, true));
+        _tempCounter = _old_tempcounter;
         var lastCheckedNameSpace = _currentNameSpace;
         _currentNameSpace = ifn.ThenNameSpaceSpace;
         ifn.ThenStat.VisitP(this);
@@ -384,12 +392,12 @@ public class ThreeAddressCodeVisitor : IVisitorP
         _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.go, endLabel));
 
         _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, elseLabel));
-        
+        _tempCounter = _old_tempcounter;
         lastCheckedNameSpace = _currentNameSpace;
         _currentNameSpace = ifn.ElseNameSpace;
         ifn.ElseStat?.VisitP(this);
         _currentNameSpace = lastCheckedNameSpace;
-        
+        _tempCounter = _old_tempcounter;
         _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.label, endLabel));
         
     }
@@ -479,6 +487,7 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
     public void VisitFuncCall(FuncCallNode f)
     {
+        
         // Нужно найти правильную специализацию
         var argTypes = new List<SemanticType>();
         var paramindex = 0;

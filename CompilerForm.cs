@@ -598,15 +598,17 @@ public partial class CompilerForm : Form
             progr.VisitP(sv);
             SymbolTree.PrintNamespaceTree(SymbolTree.Global);
      
-            //var frame_gen = new FrameSizeVisitor();
-           // progr.VisitP(frame_gen);
+            var frame_gen = new FrameSizeVisitor(); 
+            progr.VisitP(frame_gen);
 
             var gen = new ThreeAddressCodeVisitor();
-            //gen.GiveFrameSizes(frame_gen.GetFrameSizes());
+            gen.GiveFrameSizes(frame_gen.GetFrameSizes());
             progr.VisitP(gen);
 
             //var framesize = frame_gen.GetFrameSizes();
-
+            #if DEBUG
+            frame_gen.PrintFrameSizes();
+            #endif
             VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
             var code = gen.GetCode();
             
