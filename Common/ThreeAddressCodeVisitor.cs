@@ -80,8 +80,8 @@ public class ThreeAddressCodeVisitor : IVisitorP
     public Dictionary<string, int> _currentTempIndexes =new Dictionary<string, int>();
     
     private Dictionary<string, int> _frameSizes = new()
-        { {"GlobalVariables",SymbolTree.Global.Variables.Count},{ "MainFrame", 40 }, { "factorial2", 20 }, { "factorial1", 20 } };
-
+        { {"GlobalVariables",SymbolTree.Global.Variables.Count},{ "MainFrame", 10 }, { "factorial2", 20 }, { "factorial1", 20 } };
+ 
     private readonly Dictionary<string, List<ThreeAddr>> _function_codes = new();
 
     private int _labelCounter;
@@ -457,10 +457,11 @@ public class ThreeAddressCodeVisitor : IVisitorP
         foreach (var param in p.Pars.lst)
         {
             param.VisitP(this);
-            argTypes.Add(TypeChecker.CalcType(param, _currentNameSpace));
-
+            var _type = TypeChecker.CalcType(param, _currentNameSpace);
+            argTypes.Add(_type);
+            
           
-                switch (TypeChecker.CalcType(param, _currentNameSpace))
+                switch (_type)
                 {
                     case SemanticType.IntType:
                         _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.CreateAssign(Commands.iass,
@@ -519,43 +520,45 @@ public class ThreeAddressCodeVisitor : IVisitorP
         var specialization = SymbolTree.FunctionTable[f.Name.Name].Specializations
             .Find(x => x.SpecializationId == f.SpecializationId);
 
-
-        //Обработка тела функции
-        if (!_currentGeneratingFunctionName.Contains(f.Name.Name + f.SpecializationId) &&
-            !_alreadyGeneratedFunctionDefinitions.Contains(f.Name.Name + f.SpecializationId))
+        if (!SymbolTree.IsStandardFunction(f.Name.Name))
         {
-            _currentTempIndexes[_currentGeneratingFunctionName.Peek()] = _tempCounter;
-
-            _tempCounter = _currentGeneratingFunctionSpecialization.Peek().NameSpace.Variables.Count;
-
-            _currentGeneratingFunctionName.Push(f.Name.Name + f.SpecializationId);
-            if (!_function_codes.ContainsKey(f.Name.Name + f.SpecializationId))
-                _function_codes[f.Name.Name + f.SpecializationId] = new List<ThreeAddr>();
-
-            
-
-            _currentGeneratingFunctionSpecialization.Push(SymbolTree.FunctionTable[f.Name.Name].Specializations
-                .Find(x => x.SpecializationId == f.SpecializationId));
-
-            int i = 0;
-            foreach (var x in  specialization.NameSpace.Variables)
+            //Обработка тела функции
+            if (!_currentGeneratingFunctionName.Contains(f.Name.Name + f.SpecializationId) &&
+                !_alreadyGeneratedFunctionDefinitions.Contains(f.Name.Name + f.SpecializationId))
             {
-                x.Value.VariableAddress = i++;
+                _currentTempIndexes[_currentGeneratingFunctionName.Peek()] = _tempCounter;
+
+                _tempCounter = _currentGeneratingFunctionSpecialization.Peek().NameSpace.Variables.Count;
+
+                _currentGeneratingFunctionName.Push(f.Name.Name + f.SpecializationId);
+                if (!_function_codes.ContainsKey(f.Name.Name + f.SpecializationId))
+                    _function_codes[f.Name.Name + f.SpecializationId] = new List<ThreeAddr>();
+
+
+
+                _currentGeneratingFunctionSpecialization.Push(SymbolTree.FunctionTable[f.Name.Name].Specializations
+                    .Find(x => x.SpecializationId == f.SpecializationId));
+
+                int i = 0;
+                foreach (var x in specialization.NameSpace.Variables)
+                {
+                    x.Value.VariableAddress = i++;
+                }
+
+                var lastCheckedNameSpace = _currentNameSpace;
+                _currentNameSpace = specialization.NameSpace;
+                specialization.Definition.VisitP(this);
+                _currentNameSpace = lastCheckedNameSpace;
+
+                _tempCounter = _currentTempIndexes[_currentGeneratingFunctionName.Peek()];
             }
-
-            var lastCheckedNameSpace = _currentNameSpace;
-            _currentNameSpace = specialization.NameSpace;
-            specialization.Definition.VisitP(this);
-            _currentNameSpace = lastCheckedNameSpace;
-
-            _tempCounter = _currentTempIndexes[_currentGeneratingFunctionName.Peek()];
         }
 
         // Затем вызываем функцию и сохраняем результат
         var resultTemp = NewTemp();
        
         _function_codes[_currentGeneratingFunctionName.Peek()]
-                .Add(ThreeAddr.Create(Commands.call, f.Name.Name + f.SpecializationId));
+                .Add(ThreeAddr.Create(Commands.call, !SymbolTree.IsStandardFunction(f.Name.Name)? f.Name.Name + f.SpecializationId: f.Name.Name));
         _function_codes[_currentGeneratingFunctionName.Peek()]
                 .Add(ThreeAddr.Create(Commands.movout, resultTemp, true));
         

@@ -191,7 +191,17 @@ public class VirtualMachine
 
     private static readonly Dictionary<string, Action> _standardFunctions = new()
     {
-        { "print", () => ExecutePrintFunction() }
+        { "print", () => ExecutePrintFunction() },
+        { "sqrt", () => ExecuteSqrtFunction() },
+        { "sin", () => ExecuteSinFunction() },
+        { "cos", () => ExecuteCosFunction() },
+        { "abs", () => ExecuteAbsFunction() },
+        { "round", () => ExecuteRoundFunction() },
+        { "pow", () => ExecutePowFunction() },
+        { "max", () => ExecuteMaxFunction() },
+        { "min", () => ExecuteMinFunction() },
+        //{ "tostring", () => ExecuteToStringFunction() },
+   
     };
 
     // Вспомогательные методы для работы с косвенной адресацией
@@ -244,6 +254,14 @@ public class VirtualMachine
         
         _currentFrameStack.Push(new Tuple<int, int>(FrameSizes["GlobalVariables"], FrameSizes["MainFrame"]));
         FrameSizes["print"] = 1;
+        FrameSizes["min"] = 2;
+        FrameSizes["max"] = 2;
+        FrameSizes["sqrt"] = 1;
+        FrameSizes["abs"] = 1;
+        FrameSizes["round"] = 1;
+        FrameSizes["pow"] = 1;
+        FrameSizes["sin"] = 1;
+        FrameSizes["cos"] = 1;
         _currentFrameIndex=FrameSizes["GlobalVariables"];
     }
 
@@ -629,6 +647,199 @@ public class VirtualMachine
         }
     }
 
+    private static void ExecuteSqrtFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value = Mem[_currentFrameIndex];
+            if (Math.Abs(value.r) > 0.000001)
+                Mem[_currentFrameIndex].r = double.Sqrt(Mem[_currentFrameIndex].r);
+            else
+                Mem[_currentFrameIndex].r = double.Sqrt(Mem[_currentFrameIndex].i);
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция sqrt(), но фрейм для функции не был объявлен!");
+        }
+    }
+    private static void ExecuteSinFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value = Mem[_currentFrameIndex];
+            if (Math.Abs(value.r) > 0.000001)
+                Mem[_currentFrameIndex].r = double.Sin(Mem[_currentFrameIndex].r);
+            else
+                Mem[_currentFrameIndex].r = double.Sin(Mem[_currentFrameIndex].i);
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция Sin(), но фрейм для функции не был объявлен!");
+        }
+    }
+    private static void ExecuteCosFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value = Mem[_currentFrameIndex];
+            if (Math.Abs(value.r) > 0.000001)
+                Mem[_currentFrameIndex].r = double.Cos(Mem[_currentFrameIndex].r);
+            else
+                Mem[_currentFrameIndex].r = double.Cos(Mem[_currentFrameIndex].i);
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция Cos(), но фрейм для функции не был объявлен!");
+        }
+    }
+    private static void ExecuteAbsFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value = Mem[_currentFrameIndex];
+            if (Math.Abs(value.r) > 0.000001)
+                Mem[_currentFrameIndex].r = double.Abs(Mem[_currentFrameIndex].r);
+            else
+                Mem[_currentFrameIndex].i = int.Abs(Mem[_currentFrameIndex].i);
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция Abs(), но фрейм для функции не был объявлен!");
+        }
+    }
+    
+    private static void ExecuteRoundFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value = Mem[_currentFrameIndex];
+            if (Math.Abs(value.r) > 0.000001)
+                Mem[_currentFrameIndex].i = (int)Math.Round(Mem[_currentFrameIndex].r);
+            else
+                Mem[_currentFrameIndex].i = (Mem[_currentFrameIndex].i);
+            
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция Round(), но фрейм для функции не был объявлен!");
+        }
+    }
+    private static void ExecutePowFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value1 = Mem[_currentFrameIndex];
+            var value2 = Mem[_currentFrameIndex + 1];
+            if ((Math.Abs(value1.r) > 0.000001) && (Math.Abs(value2.r) > 0.000001) )
+                Mem[_currentFrameIndex].r = double.Pow(Mem[_currentFrameIndex].r, value2.r);
+            else
+                Mem[_currentFrameIndex].r =  double.Pow(Mem[_currentFrameIndex].i, value2.i);
+            
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция pow(), но фрейм для функции не был объявлен!");
+        }
+    }
+    private static void ExecuteMinFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value1 = Mem[_currentFrameIndex];
+            var value2 = Mem[_currentFrameIndex + 1];
+            if (Math.Abs(value1.r) > 0.000001)
+                Mem[_currentFrameIndex].r = double.Min(Mem[_currentFrameIndex].r, value2.r);
+            else
+                Mem[_currentFrameIndex].i = int.Min(Mem[_currentFrameIndex].i, value2.i);
+            
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция Min(), но фрейм для функции не был объявлен!");
+        }
+    }
+    private static void ExecuteMaxFunction()
+    {
+        if (_currentFrameIndex > 0)
+        {
+            var value1 = Mem[_currentFrameIndex];
+            var value2 = Mem[_currentFrameIndex + 1];
+            if (Math.Abs(value1.r) > 0.000001)
+                Mem[_currentFrameIndex].r =  double.Min(Mem[_currentFrameIndex].r, value2.r);
+            else
+                Mem[_currentFrameIndex].i = int.Max(Mem[_currentFrameIndex].i, value2.i);
+
+            
+            _returnValueRegister = Mem[_currentFrameIndex];
+            Mem[_currentFrameIndex].r = 0;
+            Mem[_currentFrameIndex].i = 0;
+            Mem[_currentFrameIndex].b = false;
+            
+            _currentFrameStack.Pop();
+            _currentFrameIndex = _currentFrameStack.Peek().Item1;
+        }
+        else
+        {
+            throw new CompilerExceptions.UnExpectedException(
+                "Вызвана стандартная функция Max(), но фрейм для функции не был объявлен!");
+        }
+    }
     public static void RunProgram(List<ThreeAddr> program)
     {
         InitializeMemory();

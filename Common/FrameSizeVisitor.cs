@@ -225,7 +225,8 @@ public class FrameSizeVisitor : IVisitorP
         var funcFullName = f.Name.Name + f.SpecializationId;
         
         // Если функция ещё не обработана - обрабатываем её тело
-        if (!_processedFunctions.Contains(funcFullName) && !_currentFunctionName.Contains(funcFullName))
+        
+        if (!_processedFunctions.Contains(funcFullName) && !_currentFunctionName.Contains(funcFullName) && !SymbolTree.IsStandardFunction(f.Name.Name))
         {
             _processedFunctions.Add(funcFullName);
             

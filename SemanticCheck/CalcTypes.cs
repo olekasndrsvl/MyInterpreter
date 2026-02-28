@@ -282,13 +282,6 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
         return specialization.ReturnType;
     }
 
-    private bool IsStandardFunction(string functionName)
-    {
-        return functionName == "Sqrt" || functionName == "Print" || functionName == "Sin" || 
-               functionName == "Cos" || functionName == "Abs" || functionName == "Round" ||
-               functionName == "Pow" || functionName == "Max" || functionName == "Min" || 
-               functionName == "ToString";
-    }
 
     private FunctionSpecialization FindMatchingStandardSpecialization(string functionName, SemanticType[] argTypes)
     {
@@ -303,7 +296,7 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
                 return spec;
             }
         }
-        return null;
+        return funcInfo.Specializations.First();
     }
 
     private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
@@ -313,7 +306,7 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
 
         for (int i = 0; i < paramTypes.Length; i++)
         {
-            if (!TypeChecker.AssignComparable(paramTypes[i], argTypes[i]))
+            if (paramTypes[i] != argTypes[i])
                 return false;
         }
         return true;

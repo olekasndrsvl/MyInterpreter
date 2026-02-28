@@ -197,7 +197,7 @@ public class FunctionInfo(FuncDefNode definition = null)
                 }
 
         //Console.WriteLine($"Created spec for {functionName} with pars: {string.Join(' ',parameterTypes)}");
-
+        
         // Создаем новую специализацию
         var newSpec = new FunctionSpecialization(parameterTypes, this)
         {
@@ -244,8 +244,8 @@ public static class SymbolTree
     }
     private static readonly HashSet<string> StandardFunctions = new()
     {
-        "Sqrt", "Sin", "Cos", "Abs", "Round", "Pow", "Max", "Min", 
-        "ToString", "Print", "Main"
+        "sqrt", "sin", "cos", "abs", "round", "pow", "max", "min", 
+        "ToString", "print", "Main"
     };
 
     public static bool IsStandardFunction(string functionName)
@@ -265,53 +265,60 @@ public static class SymbolTree
     private static void InitStandardFunctions()
     {
         // Sqrt
-        var sqrtFunc = new FunctionInfo();
-        FunctionTable["Sqrt"] = sqrtFunc;
+        var sqrtFunc = new FunctionInfo(new FuncDefNode(new IdNode("sqrt"), new List<IdNode>(){ new IdNode("x") },
+            new StatementListNode()));
+        FunctionTable["sqrt"] = sqrtFunc;
         sqrtFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
         sqrtFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.DoubleType;
 
         // Sin
-        var sinFunc = new FunctionInfo();
-        FunctionTable["Sin"] = sinFunc;
+        var sinFunc = new FunctionInfo(new FuncDefNode(new IdNode("sin"), new List<IdNode>() { new IdNode("x") },
+            new StatementListNode()));
+        FunctionTable["sin"] = sinFunc;
         sinFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
         sinFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.DoubleType;
 
         // Cos
-        var cosFunc = new FunctionInfo();
-        FunctionTable["Cos"] = cosFunc;
+        var cosFunc = new FunctionInfo(new FuncDefNode(new IdNode("cos"), new List<IdNode>() { new IdNode("x") },
+            new StatementListNode()));
+        FunctionTable["cos"] = cosFunc;
         cosFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
         cosFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.DoubleType;
 
         // Abs
-        var absFunc = new FunctionInfo();
-        FunctionTable["Abs"] = absFunc;
+        var absFunc = new FunctionInfo(new FuncDefNode(new IdNode("abs"), new List<IdNode>() { new IdNode("x") },
+            new StatementListNode()));
+        FunctionTable["abs"] = absFunc;
         absFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.DoubleType;
         absFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.IntType;
 
         // Round
-        var roundFunc = new FunctionInfo();
-        FunctionTable["Round"] = roundFunc;
+        var roundFunc = new FunctionInfo( new FuncDefNode(new IdNode("round"), new List<IdNode>(){new IdNode("x")}, new StatementListNode()));
+        FunctionTable["round"] = roundFunc;
         roundFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.IntType;
 
         // Pow
-        var powFunc = new FunctionInfo();
-        FunctionTable["Pow"] = powFunc;
+        var powFunc = new FunctionInfo(new FuncDefNode(new IdNode("pow"), new List<IdNode>() { new IdNode("x"),new IdNode("y") },
+            new StatementListNode()));
+        FunctionTable["pow"] = powFunc;
         powFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType, SemanticType.DoubleType }).ReturnType =
             SemanticType.DoubleType;
         powFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType, SemanticType.IntType }).ReturnType =
             SemanticType.DoubleType;
 
         // Max
-        var maxFunc = new FunctionInfo();
-        FunctionTable["Max"] = maxFunc;
+        var maxFunc = new FunctionInfo(new FuncDefNode(new IdNode("max"), new List<IdNode>() { new IdNode("x"), new IdNode("y") },
+            new StatementListNode()));
+        FunctionTable["max"] = maxFunc;
         maxFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType, SemanticType.DoubleType }).ReturnType =
             SemanticType.DoubleType;
         maxFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType, SemanticType.IntType }).ReturnType =
             SemanticType.IntType;
 
         // Min
-        var minFunc = new FunctionInfo();
-        FunctionTable["Min"] = minFunc;
+        var minFunc = new FunctionInfo(new FuncDefNode(new IdNode("min"), new List<IdNode>() { new IdNode("x"), new IdNode("y") },
+            new StatementListNode()));
+        FunctionTable["min"] = minFunc;
         minFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType, SemanticType.DoubleType }).ReturnType =
             SemanticType.DoubleType;
         minFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType, SemanticType.IntType }).ReturnType =
@@ -323,7 +330,7 @@ public static class SymbolTree
         toStringFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.StringType;
         // Print
         var printFunc = new FunctionInfo();
-        FunctionTable["Print"] = printFunc;
+        FunctionTable["print"] = printFunc;
         printFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.NoType;
 
 
