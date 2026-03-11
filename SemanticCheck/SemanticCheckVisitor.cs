@@ -331,13 +331,20 @@ public class SemanticCheckVisitor : AutoVisitor
             return;
         }
         // Если тело функции еще не проверено для этой специализации, проверяем его
-        if (!specialization.BodyChecked && !IsStandardFunction(f.Name.Name))
+        try
         {
-            specialization.BodyChecked = true;
-            var oldNamespace = _currentNamespace;
-            _currentNamespace = specialization.NameSpace;
-            CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
-            _currentNamespace=oldNamespace;
+            if (!specialization.BodyChecked && !IsStandardFunction(f.Name.Name))
+            {
+                specialization.BodyChecked = true;
+                var oldNamespace = _currentNamespace;
+                _currentNamespace = specialization.NameSpace;
+                CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
+                _currentNamespace = oldNamespace;
+            }
+        }
+        catch (CompilerExceptions.SemanticException ex)
+        {
+            CompilerExceptions.SemanticError($"Ошибка при вызове функцииx {f.Name}: {ex.Message}", f.Pos);
         }
 
         // Устанавливаем тип возвращаемого значения для вызова функции
