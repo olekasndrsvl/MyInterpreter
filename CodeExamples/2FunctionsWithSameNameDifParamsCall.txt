@@ -1,0 +1,15 @@
+def f(integer : a)
+  {
+  
+    };
+  
+def f(bool : x)
+  {
+
+    
+    };
+  
+{
+  var x = f(1);
+  print(1);
+  }

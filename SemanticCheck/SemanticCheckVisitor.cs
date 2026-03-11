@@ -215,7 +215,7 @@ public class SemanticCheckVisitor : AutoVisitor
     {
         
         // Проверяем, не объявлена ли уже функция с таким именем
-        if (FunctionTable.ContainsKey(node.Name.Name))
+        if (FunctionTable.ContainsKey(node.Name.Name) && !node.IsClearTypes)
         {
             CompilerExceptions.SemanticError($"Функция '{node.Name.Name}' уже объявлена", node.Name.Pos);
             return;
@@ -227,21 +227,36 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         
         // Сохраняем определение функции
-        FunctionTable[node.Name.Name] = new FunctionInfo(isTemplate: node.IsClearTypes);
-        FunctionTable[node.Name.Name].Definition = node;
+        if(!FunctionTable.ContainsKey(node.Name.Name))
+        {
+            FunctionTable[node.Name.Name] = new FunctionInfo(isTemplate: !node.IsClearTypes);
+            FunctionTable[node.Name.Name].Definition = node;
+        }
 
-       
-        
-        // Добавляем функцию с типами AnyType - конкретные типы будут выведены при вызовах
-        var paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
-       
-        var funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
-        // Тут проверим тело функции для AnyType
+        SemanticType[] paramTypes;
+        FunctionSpecialization funcSpec;
+        if (!node.IsClearTypes)
+        {
+            // Добавляем функцию с типами AnyType - конкретные типы будут выведены при вызовах
+            paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
+            funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
+
+        }
+        else
+        {
+            paramTypes = node.Params.Select(x => x.ValueType).ToArray();
+            funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
+            funcSpec.Definition = node;
+        }
+
+        // Тут проверим тело функции
         CurrentCheckingFunctionSpecialization.Push(funcSpec);
         _currentNamespace = funcSpec.NameSpace;
         var returnTypes = new List<SemanticType>();
-        CollectReturnTypes(FunctionTable[node.Name.Name].Definition.Body, returnTypes);
-
+        if(FunctionTable[node.Name.Name].IsTemplateFunction)
+            CollectReturnTypes(FunctionTable[node.Name.Name].Definition.Body, returnTypes);
+        else
+            CollectReturnTypes(funcSpec.Definition.Body, returnTypes);
         // Выводим тип возвращаемого значения
         if (returnTypes.Count > 0)
         {
@@ -256,7 +271,6 @@ public class SemanticCheckVisitor : AutoVisitor
             // Если нет return statements, то тип NoType
             funcSpec.ReturnType = SemanticType.NoType;
         }
-
         if(!funcSpec.BodyChecked)
         {
             funcSpec.BodyChecked = true;
@@ -266,7 +280,6 @@ public class SemanticCheckVisitor : AutoVisitor
         
         if (CurrentCheckingFunctionSpecialization.Count > 1)
             CurrentCheckingFunctionSpecialization.Pop();
-      
     }
 
     public override void VisitFuncCall(FuncCallNode f)
@@ -306,9 +319,16 @@ public class SemanticCheckVisitor : AutoVisitor
         {
             specialization = FindMatchingStandardSpecialization(f.Name.Name, argTypes.ToArray());
         }
+        else if (funcInfo.IsTemplateFunction)
+            specialization = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
         else
-            specialization = FunctionTable[f.Name.Name].FindOrCreateSpecialization(argTypes.ToArray());
-        
+            specialization = funcInfo.FindSpecialization(argTypes.ToArray());
+
+
+        if (specialization == null)
+        {
+            CompilerExceptions.SemanticError($"Невозможно вызвать функцию {f.Name.Name} c параметрами {string.Join(',',argTypes)}", f.Pos);
+        }
         
         // Проверяем совместимость типов аргументов
         for (var i = 0; i < specialization.ParameterTypes.Length; i++)

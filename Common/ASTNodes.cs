@@ -848,6 +848,7 @@ public class FuncDefNode : DefinitionNode
         this.Params = Params;
         this.Body = Body;
         Pos = p;
+        IsClearTypes = isClearTyped;
     }
 
     public IdNode Name { get; set; }
@@ -858,7 +859,12 @@ public class FuncDefNode : DefinitionNode
 
     public override string ToString()
     {
-        return $"def {Name}({string.Join(",", Params)}) {Body}";
+        // Форматируем параметры с типами
+        var formattedParams = Params.Select(p => $"{p.ValueType}: {p.Name}");
+        
+        return !IsClearTypes 
+            ? $"def {Name}({string.Join(", ", Params.Select(p => p.Name))}) {Body}"
+            : $"def {Name}({string.Join(", ", formattedParams)}) {Body}";
     }
 
     public override T Visit<T>(IVisitor<T> v)
