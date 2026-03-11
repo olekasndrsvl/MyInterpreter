@@ -72,11 +72,12 @@ public abstract class ParserBase<TokenType>
 // Program := DefinitionsAndStatements
 // DefinitionsAndStatements := (DefinitionsList MainProgram | MainProgram | E)
 // DefinitionsList := Definition (';', Definition)*
+
 // MainProgram := BlockStatement
 // FunDefList := FuncDef+
 // StatementList := Statement (';' Statement)*
 // Statement := Assign | ProcCall | IfStatement | WhileStatement | ForStatement | BlockStatement | ReturnStatement
-// FuncDef := def Id '(' IdList ')' Statement
+// FuncDef := def Id '(' IdList ')' Statement | def Id '(' TypedIdList ')' Statement
 // Assign := Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
 // VarAssign := var Id = Expr
 // ProcCall := Id '(' ExprList ')
@@ -95,6 +96,7 @@ public abstract class ParserBase<TokenType>
 // Factor := IntNum | DoubleNum | FuncCall | '(' Expr ') | Id
 // ExprList := Expr (',' Expr)*
 // IdList := Id (',' Id)*
+// TypedIdList = TypeNode':' IdN (',' TypeNode':' Id)*
 
 
 public class Parser : ParserBase<TokenType>
@@ -143,13 +145,22 @@ public class Parser : ParserBase<TokenType>
         
         var name = Ident();
         Requires(TokenType.LPar);
+        List<IdNode> parameters = new List<IdNode>();
+
+        bool typed = false;
+        if (At(TokenType.tkInt) || At(TokenType.tkDbl) || At(TokenType.tkBool))
+        {
+            typed = true;
+            parameters = TypedIdList();
+        }
+        else
+            parameters = IdList();
         
-        var parameters = IdList();
         Requires(TokenType.RPar);
         
         var body = Statement();
         
-        return new FuncDefNode(name, parameters, body, new Position(lex.GetLineNumber(), pos));
+        return new FuncDefNode(name, parameters, body, typed,new Position(lex.GetLineNumber(), pos));
     }
 
     public DefinitionsListNode DefinitionList()
@@ -413,6 +424,54 @@ public class Parser : ParserBase<TokenType>
             {
                 if (!At(TokenType.Id)) break;
                 parameters.Add(Ident());
+            }
+        }
+        
+        return parameters;
+    }
+
+    private TypeNode TypeIdNode()
+    {
+        if (At(TokenType.tkDbl))
+        {
+            Requires(TokenType.tkDbl);
+            return new DoubleTypeNode();
+        }
+        else if (At(TokenType.tkInt))
+        {
+            Requires(TokenType.tkInt);
+            return new IntTypeNode();
+        }
+        else if (At(TokenType.tkBool))
+        {
+            Requires(TokenType.tkBool);
+            return new BoolTypeNode();
+        }
+        else
+            ExpectedError(TokenType.tkInt,TokenType.tkBool, TokenType.tkDbl);
+        return null;
+    }
+    private List<IdNode> TypedIdList()
+    {
+        var parameters = new List<IdNode>();
+        
+        if (At(TokenType.tkDbl) || At(TokenType.tkBool) || At(TokenType.tkInt))
+        {
+            var tp = TypeIdNode();
+            Requires(TokenType.Colon);
+            var id = Ident();
+           
+            id.ValueType = tp.Type;
+            parameters.Add(id);
+            
+            while (IsMatch(TokenType.Comma))
+            {
+                if (!At(TokenType.tkDbl) && !At(TokenType.tkBool) && !At(TokenType.tkInt)) break;
+                tp = TypeIdNode();
+                Requires(TokenType.Colon);
+                id = Ident();
+                id.ValueType = tp.Type;
+                parameters.Add(id);
             }
         }
         

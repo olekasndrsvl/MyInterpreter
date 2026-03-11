@@ -5,6 +5,10 @@ namespace MyInterpreter;
 public interface IVisitor<T>
 {
     T VisitNode(Node bin);
+    T VisitTypeNode(TypeNode tpn);
+    T VisitIntTypeNode(IntTypeNode itn);
+    T VisitBoolTypeNode(BoolTypeNode btn);
+    T VisitDoubleTypeNode(DoubleTypeNode dtn);
     T VisitDefinitionNode(DefinitionNode def);
     T VisitExprNode(ExprNode bin);
     T VisitStatementNode(StatementNode bin);
@@ -33,6 +37,10 @@ public interface IVisitor<T>
 public interface IVisitorP
 {
     void VisitNode(Node bin);
+    void VisitTypeNode(TypeNode tpn);
+    void VisitIntTypeNode(IntTypeNode itn);
+    void VisitBoolTypeNode(BoolTypeNode btn);
+    void VisitDoubleTypeNode(DoubleTypeNode dtn);
     void VisitDefinitionNode(DefinitionNode defNode);
     void VisitExprNode(ExprNode bin);
     void VisitStatementNode(StatementNode bin);
@@ -114,6 +122,72 @@ public abstract class StatementNode : Node
     }
 }
 
+public abstract class TypeNode : Node
+{
+    public SemanticType Type = SemanticType.NoType;
+    public virtual T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitNode(this);
+    }
+
+    public virtual void VisitP(IVisitorP v)
+    {
+        v.VisitNode(this);
+    }
+}
+
+public class IntTypeNode : TypeNode
+{
+    public IntTypeNode() => Type = SemanticType.IntType;
+    public virtual T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitIntTypeNode(this);
+    }
+
+    public virtual void VisitP(IVisitorP v)
+    {
+        v.VisitIntTypeNode(this);
+    }
+    public override object Clone()
+    {
+        return this;
+    }
+}
+public class BoolTypeNode : TypeNode
+{
+    public BoolTypeNode() => Type = SemanticType.BoolType;
+    public virtual T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitBoolTypeNode(this);
+    }
+
+    public virtual void VisitP(IVisitorP v)
+    {
+        v.VisitBoolTypeNode(this);
+    }
+    public override object Clone()
+    {
+        return this;
+    }
+}
+
+public class DoubleTypeNode : TypeNode
+{
+    public DoubleTypeNode() => Type = SemanticType.DoubleType;
+    public virtual T Visit<T>(IVisitor<T> v)
+    {
+        return v.VisitDoubleTypeNode(this);
+    }
+
+    public virtual void VisitP(IVisitorP v)
+    {
+        v.VisitDoubleTypeNode(this);
+    }
+    public override object Clone()
+    {
+        return this;
+    }
+}
 public class BinOpNode : ExprNode
 {
     public BinOpNode(ExprNode Left, ExprNode Right, TokenType Op, Position pos = null)
@@ -317,7 +391,7 @@ public class IdNode : ExprNode
     }
 
     public string Name { get; set; }
-    public SemanticType ValueType { get; set; } // тип значения
+    public SemanticType ValueType { get; set; } // тип значения для явно типизации
 
     public override string ToString()
     {
@@ -768,7 +842,7 @@ public class FuncDefNode : DefinitionNode
     {
     }
 
-    public FuncDefNode(IdNode Name, List<IdNode> Params, StatementNode Body, Position p = null)
+    public FuncDefNode(IdNode Name, List<IdNode> Params, StatementNode Body, bool isClearTyped = false,Position p = null)
     {
         this.Name = Name;
         this.Params = Params;
@@ -778,6 +852,7 @@ public class FuncDefNode : DefinitionNode
 
     public IdNode Name { get; set; }
     public List<IdNode> Params { get; set; }
+    public bool IsClearTypes = false;
     public StatementNode Body { get; set; }
     public SemanticType ReturnType { get; set; }
 
@@ -803,6 +878,7 @@ public class FuncDefNode : DefinitionNode
             (IdNode)Name?.Clone(),
             clonedParams,
             (StatementNode)Body?.Clone(),
+            IsClearTypes,
             Pos?.Clone() as Position
         )
         {

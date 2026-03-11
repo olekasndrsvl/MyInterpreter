@@ -71,7 +71,7 @@ public class SemanticCheckVisitor : AutoVisitor
         ass.Expr.VisitP(this);
         // Вычислить тип
         var typ = CalcTypeVis(ass.Expr, _currentNamespace);
-        ass.Ident.ValueType = typ;
+       
         var variable = _currentNamespace.LookupVariable(ass.Ident.Name);
         if (CurrentCheckingFunctionSpecialization.Count > 0 && variable != null)
         {
@@ -87,7 +87,7 @@ public class SemanticCheckVisitor : AutoVisitor
             if (!AssignComparable(idtyp, typ))
                 CompilerExceptions.SemanticError(
                     $"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
-            ass.Ident.ValueType = typ;
+         
         }
         else
         {
@@ -123,9 +123,6 @@ public class SemanticCheckVisitor : AutoVisitor
             if (!AssignComparable(idtyp, typ))
                 CompilerExceptions.SemanticError(
                     $"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
-
-
-            ass.Ident.ValueType = typ;
         }
     }
 
@@ -230,7 +227,7 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         
         // Сохраняем определение функции
-        FunctionTable[node.Name.Name] = new FunctionInfo();
+        FunctionTable[node.Name.Name] = new FunctionInfo(isTemplate: node.IsClearTypes);
         FunctionTable[node.Name.Name].Definition = node;
 
        

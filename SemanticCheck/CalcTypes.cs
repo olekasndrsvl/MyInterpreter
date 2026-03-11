@@ -110,13 +110,14 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     public SemanticType CalcTypeVis(ExprNode ex) => ex.Visit(this);
     
     public SemanticType VisitNode(Node bin) => SemanticType.NoType;
-    public SemanticType VisitDefinitionNode(DefinitionNode def)
-    {
-        throw new NotImplementedException();
-    }
+    public SemanticType VisitTypeNode(TypeNode tpn) => SemanticType.NoType;
+    public SemanticType VisitIntTypeNode(IntTypeNode itn) => itn.Type;
 
+    public SemanticType VisitBoolTypeNode(BoolTypeNode btn) => btn.Type;
+
+    public SemanticType VisitDoubleTypeNode(DoubleTypeNode dtn) => dtn.Type;
+    public SemanticType VisitDefinitionNode(DefinitionNode def) => SemanticType.NoType;
     public SemanticType VisitExprNode(ExprNode bin) => SemanticType.NoType;
-    
     public SemanticType VisitStatementNode(StatementNode bin) => SemanticType.NoType;
     
     public SemanticType VisitBinOp(BinOpNode bin)
