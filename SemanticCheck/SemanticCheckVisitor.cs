@@ -245,6 +245,8 @@ public class SemanticCheckVisitor : AutoVisitor
         else
         {
             paramTypes = node.Params.Select(x => x.ValueType).ToArray();
+            if(FunctionTable[node.Name.Name].FindSpecialization(paramTypes) != null)
+                CompilerExceptions.SemanticError($"Функция с именем {node.Name.Name} и типами параметров: {string.Join(',',paramTypes)} уже объявлена!", node.Name.Pos);
             funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
             funcSpec.Definition = node;
         }
