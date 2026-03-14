@@ -66,7 +66,8 @@ public class FormatCodeVisitor : IVisitor<string>
     }
 
     public string VisitInt(IntNode n) => n.Val.ToString();
-    public string VisitDouble(DoubleNode d) => d.Val.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    public string VisitDouble(DoubleNode d) => d.Val.ToString("0.0##########################", 
+        System.Globalization.CultureInfo.InvariantCulture);
     public string VisitId(IdNode id) => id.Name;
 
     public string VisitAssign(AssignNode ass)

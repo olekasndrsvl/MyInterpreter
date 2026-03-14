@@ -21,6 +21,10 @@ public partial class CompilerForm : Form
     private List<Token> _tokens = new List<Token>();
     private System.Windows.Forms.Timer _highlightTimer = null!;
     private bool _needsHighlighting = false;
+    
+    // Для отслеживания текущего файла
+    private string _currentFilePath = string.Empty;
+    private bool _isFileModified = false;
 
     public CompilerForm()
     {
@@ -30,6 +34,7 @@ public partial class CompilerForm : Form
         SetupEditor();
         SetupContextMenu();
         SetupHighlightTimer();
+        UpdateWindowTitle();
     }
 
     private void SetupHighlightTimer()
@@ -47,8 +52,6 @@ public partial class CompilerForm : Form
         // Настройка отступов - базовые свойства Scintilla
         codeTextBox.UseTabs = false;           // Использовать пробелы вместо табуляции
         codeTextBox.TabWidth = 2;               // Ширина табуляции 2 пробела
-        
-        // Убираем Indent и Indentation, так как они могут не поддерживаться
         
         // Настройка полей (margins)
         codeTextBox.Margins.Left = 4;
@@ -168,6 +171,13 @@ public partial class CompilerForm : Form
         _needsHighlighting = true;
         _highlightTimer.Stop();
         _highlightTimer.Start();
+        
+        // Если текст изменился и это не загрузка файла, помечаем как измененный
+        if (!_isFileModified)
+        {
+            _isFileModified = true;
+            UpdateWindowTitle();
+        }
     }
 
     private void HighlightTimer_Tick(object? sender, EventArgs e)
@@ -324,7 +334,6 @@ public partial class CompilerForm : Form
 
     private void ClearErrorMarkers()
     {
-        // Используем MarkerDeleteAll с номером маркера
         codeTextBox.MarkerDeleteAll(0);
     }
 
@@ -332,8 +341,6 @@ public partial class CompilerForm : Form
     {
         if (lineNumber >= 0 && lineNumber < codeTextBox.Lines.Count)
         {
-            // В некоторых версиях ScintillaNET используется MarkerAdd(line, markerNumber)
-            // Но если не работает, можно использовать альтернативный подход:
             codeTextBox.Lines[lineNumber].MarkerAdd(0);
         }
     }
@@ -451,15 +458,38 @@ public partial class CompilerForm : Form
         outputTextBox.Font = new Font("Consolas", 10);
     }
 
-    private void NewMenuItem_Click(object sender, EventArgs e)
+    // НОВЫЙ МЕТОД: Обновление заголовка окна
+    private void UpdateWindowTitle()
     {
-        codeTextBox.Text = "";
-        outputTextBox.Text = "";
-        ClearErrorMarkers();
+        string fileName = string.IsNullOrEmpty(_currentFilePath) 
+            ? "Безымянный" 
+            : Path.GetFileName(_currentFilePath);
+        
+        string modifiedMark = _isFileModified ? "*" : "";
+        
+        this.Text = $"Компилятор - {fileName}{modifiedMark}";
     }
 
+    // ОБНОВЛЕННЫЙ МЕТОД: Новый файл
+    private void NewMenuItem_Click(object sender, EventArgs e)
+    {
+        if (CheckForUnsavedChanges())
+        {
+            codeTextBox.Text = "";
+            outputTextBox.Text = "";
+            ClearErrorMarkers();
+            
+            _currentFilePath = string.Empty;
+            _isFileModified = false;
+            UpdateWindowTitle();
+        }
+    }
+
+    // ОБНОВЛЕННЫЙ МЕТОД: Открыть файл
     private void OpenMenuItem_Click(object sender, EventArgs e)
     {
+        if (!CheckForUnsavedChanges()) return;
+        
         using (var openDialog = new OpenFileDialog())
         {
             openDialog.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
@@ -467,27 +497,103 @@ public partial class CompilerForm : Form
             
             if (openDialog.ShowDialog() == DialogResult.OK)
             {
-                codeTextBox.Text = File.ReadAllText(openDialog.FileName);
-                ClearErrorMarkers();
-                outputTextBox.Text = $"Файл загружен: {openDialog.FileName}\n";
+                try
+                {
+                    codeTextBox.Text = File.ReadAllText(openDialog.FileName);
+                    ClearErrorMarkers();
+                    
+                    _currentFilePath = openDialog.FileName;
+                    _isFileModified = false;
+                    UpdateWindowTitle();
+                    
+                    outputTextBox.Text = $"✅ Файл загружен: {openDialog.FileName}\n";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при открытии файла: {ex.Message}", 
+                        "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
     }
 
+    // ОБНОВЛЕННЫЙ МЕТОД: Сохранить файл
     private void SaveMenuItem_Click(object sender, EventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentFilePath))
+        {
+            // Если файл не был сохранен ранее, вызываем Save As
+            SaveAsMenuItem_Click(sender, e);
+        }
+        else
+        {
+            try
+            {
+                File.WriteAllText(_currentFilePath, codeTextBox.Text);
+                _isFileModified = false;
+                UpdateWindowTitle();
+                outputTextBox.Text = $"✅ Файл сохранен: {_currentFilePath}\n";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при сохранении файла: {ex.Message}", 
+                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    // НОВЫЙ МЕТОД: Сохранить как
+    private void SaveAsMenuItem_Click(object sender, EventArgs e)
     {
         using (var saveDialog = new SaveFileDialog())
         {
             saveDialog.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
-            saveDialog.Title = "Сохранить файл с кодом";
+            saveDialog.Title = "Сохранить файл с кодом как";
             saveDialog.DefaultExt = "txt";
             
             if (saveDialog.ShowDialog() == DialogResult.OK)
             {
-                File.WriteAllText(saveDialog.FileName, codeTextBox.Text);
-                outputTextBox.Text = $"Файл сохранен: {saveDialog.FileName}\n";
+                try
+                {
+                    File.WriteAllText(saveDialog.FileName, codeTextBox.Text);
+                    
+                    _currentFilePath = saveDialog.FileName;
+                    _isFileModified = false;
+                    UpdateWindowTitle();
+                    
+                    outputTextBox.Text = $"✅ Файл сохранен: {saveDialog.FileName}\n";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при сохранении файла: {ex.Message}", 
+                        "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
+    }
+
+    // НОВЫЙ МЕТОД: Проверка несохраненных изменений
+    private bool CheckForUnsavedChanges()
+    {
+        if (!_isFileModified) return true;
+        
+        var result = MessageBox.Show(
+            "Файл был изменен. Сохранить изменения?", 
+            "Несохраненные изменения", 
+            MessageBoxButtons.YesNoCancel, 
+            MessageBoxIcon.Question);
+        
+        if (result == DialogResult.Yes)
+        {
+            SaveMenuItem_Click(this, EventArgs.Empty);
+            return true;
+        }
+        else if (result == DialogResult.No)
+        {
+            return true;
+        }
+        
+        return false; // Cancel
     }
 
     private void PrepareBeforeCompilation()
@@ -600,6 +706,10 @@ public partial class CompilerForm : Form
             codeTextBox.Text = progr.Visit(pp);
 
             outputTextBox.Text = "✅ Код отформатирован!\n";
+            
+            // После форматирования помечаем файл как измененный
+            _isFileModified = true;
+            UpdateWindowTitle();
         }
         catch (CompilerExceptions.BaseCompilerException ex)
         {

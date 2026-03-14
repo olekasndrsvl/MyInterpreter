@@ -1,19 +1,16 @@
 {
   var j = 0;
-  for (var i = 0; (i<=10); i += 1) do
-  {
+    for (var i = 0; i <= 10; i += 1) do {
     print(j);
     j += 1;
     var u = 0;
     {
-      var j =12;
-      print(j);
+      var j = 12;
+      print(j)
     };
-  
     {
-      var j =14.5;
-      print(j);
-      
+      var j = 14.5;
+      print(j)
     }
   }
 }
