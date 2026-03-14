@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using MyInterpreter.SemanticCheck;
 
 namespace MyInterpreter;
 
@@ -288,10 +289,14 @@ public class FormatCodeVisitor : IVisitor<string>
     public string VisitFuncDef(FuncDefNode f)
     {
         string parameters = string.Join(", ", f.Params.Select(p => p.Name));
+        var formattedParams = f.Params.Select(p => $" { ToFriendlyString(p.ValueType)}: {p.Name}");
+        
+      
         string body = VisitNode(f.Body);
         
         // Функция всегда начинается с новой строки
-        string result = $"{Indent()}def {f.Name.Name}({parameters})";
+        var pars = f.IsClearTypes ? string.Join(',', formattedParams) : parameters;
+        string result = $"{Indent()}def {f.Name.Name}({pars})";
         
         // Если тело - блок, ставим его на той же строке
         if (f.Body is BlockNode)
@@ -364,5 +369,19 @@ public class FormatCodeVisitor : IVisitor<string>
         }
         
         return string.Join(";\n", definitions);
+    }
+    public static string ToFriendlyString(SemanticType type)
+    {
+        return type switch
+        {
+            SemanticType.IntType => "integer",
+            SemanticType.DoubleType => "double",
+            SemanticType.BoolType => "bool",
+            SemanticType.StringType => "string",
+            SemanticType.BadType => "ошибочный тип",
+            SemanticType.NoType => "void",
+            SemanticType.AnyType => "any",
+            _ => "unknown"
+        };
     }
 }
