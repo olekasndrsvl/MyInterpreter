@@ -1,11 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using ScintillaNET;
 using MyInterpreter.Common;
 using MyInterpreter.SemanticCheck;
 
@@ -13,484 +14,414 @@ namespace MyInterpreter;
 
 public partial class CompilerForm : Form
 {
-    public static CompilerForm Instance;
-    private bool _ctrlPressed = false;
-    private bool _isHighlighting = false;
+    public static CompilerForm? Instance;
     
-    // Список ключевых слов для подсветки
-    private readonly HashSet<string> _keywords = new HashSet<string>
-    {
-        "if", "then", "else", "while", "do", "for", 
-        "def", "return", "var", "print"
-    };
+    // Для подсветки синтаксиса через ваш лексер
+    private Lexer _lexer = null!;
+    private List<Token> _tokens = new List<Token>();
+    private System.Windows.Forms.Timer _highlightTimer = null!;
+    private bool _needsHighlighting = false;
 
     public CompilerForm()
     {
         InitializeComponent();
         Instance = this;
-        
-        // Настраиваем RichTextBox для подсветки синтаксиса
+
+        SetupEditor();
+        SetupContextMenu();
+        SetupHighlightTimer();
+    }
+
+    private void SetupHighlightTimer()
+    {
+        _highlightTimer = new System.Windows.Forms.Timer();
+        _highlightTimer.Interval = 500;
+        _highlightTimer.Tick += HighlightTimer_Tick;
+    }
+
+    private void SetupEditor()
+    {
+        // Базовая настройка
         codeTextBox.Font = new Font("Consolas", 10);
+        
+        // Настройка отступов - базовые свойства Scintilla
+        codeTextBox.UseTabs = false;           // Использовать пробелы вместо табуляции
+        codeTextBox.TabWidth = 2;               // Ширина табуляции 2 пробела
+        
+        // Убираем Indent и Indentation, так как они могут не поддерживаться
+        
+        // Настройка полей (margins)
+        codeTextBox.Margins.Left = 4;
+        codeTextBox.Margins[0].Width = 50;
+        codeTextBox.Margins[0].Type = MarginType.Number;
+        codeTextBox.Margins[0].Mask = 0;
+
+        // Поле для маркеров ошибок
+        codeTextBox.Margins[1].Type = MarginType.Symbol;
+        codeTextBox.Margins[1].Width = 16;
+        codeTextBox.Margins[1].Mask = (1 << 0); // Используем бит 0 для маркеров
+
+        // Настройка маркеров для ошибок
+        codeTextBox.Markers[0].SetBackColor(Color.Red);
+        codeTextBox.Markers[0].SetForeColor(Color.White);
+        codeTextBox.Markers[0].Symbol = MarkerSymbol.Circle;
+
+        // Настройка выделения
+        codeTextBox.SetSelectionBackColor(true, Color.FromArgb(50, 100, 150));
+        codeTextBox.SetSelectionForeColor(true, Color.White);
+
+        // Подсветка текущей строки
+        codeTextBox.CaretLineVisible = true;
+        codeTextBox.CaretLineBackColor = Color.FromArgb(240, 240, 240);
+
+        // Базовая настройка стилей
+        codeTextBox.Styles[Style.Default].Font = "Consolas";
+        codeTextBox.Styles[Style.Default].Size = 10;
+        codeTextBox.Styles[Style.Default].ForeColor = Color.Black;
+        codeTextBox.Styles[Style.Default].BackColor = Color.White;
+
+        // Применяем базовый стиль
+        codeTextBox.StyleClearAll();
+
+        // Настройка пользовательских стилей
+        ConfigureCustomStyles();
+
+        // Подписка на события
         codeTextBox.TextChanged += CodeTextBox_TextChanged;
         codeTextBox.KeyDown += CodeTextBox_KeyDown;
-        codeTextBox.KeyUp += CodeTextBox_KeyUp;
+        codeTextBox.StyleNeeded += CodeTextBox_StyleNeeded;
+    }
+
+    private void ConfigureCustomStyles()
+    {
+        // Стиль 10: Ключевые слова
+        codeTextBox.Styles[10].ForeColor = Color.Blue;
+        codeTextBox.Styles[10].Bold = true;
         
-        // Настраиваем контекстное меню для копирования/вставки
-        SetupContextMenu();
+        // Стиль 11: Идентификаторы
+        codeTextBox.Styles[11].ForeColor = Color.Black;
+        
+        // Стиль 12: Числа (int)
+        codeTextBox.Styles[12].ForeColor = Color.DarkGreen;
+        
+        // Стиль 13: Числа с плавающей точкой
+        codeTextBox.Styles[13].ForeColor = Color.DarkGreen;
+        
+        // Стиль 14: Строковые литералы
+        codeTextBox.Styles[14].ForeColor = Color.DarkRed;
+        
+        // Стиль 15: Операторы
+        codeTextBox.Styles[15].ForeColor = Color.Purple;
+        
+        // Стиль 16: Комментарии
+        codeTextBox.Styles[16].ForeColor = Color.Green;
+        codeTextBox.Styles[16].Italic = true;
+        
+        // Стиль 17: Логические значения
+        codeTextBox.Styles[17].ForeColor = Color.Teal;
+        codeTextBox.Styles[17].Bold = true;
+        
+        // Стиль 18: Типы
+        codeTextBox.Styles[18].ForeColor = Color.Teal;
+        codeTextBox.Styles[18].Bold = true;
+        
+        // Стиль 19: Ключевые слова управления
+        codeTextBox.Styles[19].ForeColor = Color.Blue;
+        codeTextBox.Styles[19].Bold = true;
+    }
+
+    private int GetStyleForTokenType(TokenType type)
+    {
+        return type switch
+        {
+            TokenType.tkIf or TokenType.tkThen or TokenType.tkElse or 
+            TokenType.tkWhile or TokenType.tkDo or TokenType.tkFor or
+            TokenType.tkDef or TokenType.tkReturn or TokenType.tkVar => 19,
+            
+            TokenType.tkInt or TokenType.tkBool or TokenType.tkDbl => 18,
+            
+            TokenType.tkTrue or TokenType.tkFalse => 17,
+            
+            TokenType.Id => 11,
+            
+            TokenType.Int => 12,
+            TokenType.DoubleLiteral => 13,
+            
+            TokenType.StringLiteral => 14,
+            
+            TokenType.Plus or TokenType.Minus or TokenType.Multiply or 
+            TokenType.Divide or TokenType.Assign or TokenType.AssignPlus or
+            TokenType.AssignMinus or TokenType.AssignMult or TokenType.AssignDiv or
+            TokenType.Equal or TokenType.Less or TokenType.LessEqual or
+            TokenType.Greater or TokenType.GreaterEqual or TokenType.NotEqual or
+            TokenType.tkAnd or TokenType.tkOr or TokenType.tkNot or
+            TokenType.Dot or TokenType.Comma or TokenType.Colon or
+            TokenType.Semicolon or TokenType.LPar or TokenType.RPar or
+            TokenType.LBrace or TokenType.RBrace => 15,
+            
+            _ => 11
+        };
+    }
+
+    private void CodeTextBox_TextChanged(object? sender, EventArgs e)
+    {
+        _needsHighlighting = true;
+        _highlightTimer.Stop();
+        _highlightTimer.Start();
+    }
+
+    private void HighlightTimer_Tick(object? sender, EventArgs e)
+    {
+        _highlightTimer.Stop();
+        if (_needsHighlighting)
+        {
+            _needsHighlighting = false;
+            PerformSyntaxHighlighting();
+        }
+    }
+
+    private void PerformSyntaxHighlighting()
+    {
+        try
+        {
+            _lexer = new Lexer(codeTextBox.Text);
+            _tokens = new List<Token>();
+            
+            TokenT<TokenType> token;
+            do
+            {
+                token = _lexer.NextToken();
+                if (token != null)
+                {
+                    _tokens.Add(new Token(token.Typ, 
+                        new Position(_lexer.GetLineNumber(), token.Pos), 
+                        token.Value ?? ""));
+                }
+            } while (token != null && token.Typ != TokenType.Eof);
+            
+            ApplyHighlighting();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Highlighting error: {ex.Message}");
+        }
+    }
+
+    private void ApplyHighlighting()
+    {
+        if (_tokens == null || _tokens.Count == 0) return;
+        
+        var text = codeTextBox.Text;
+        
+        // Сбрасываем стили
+        codeTextBox.StartStyling(0);
+        
+        int currentPos = 0;
+        foreach (var token in _tokens)
+        {
+            if (token?.value == null) continue;
+            
+            string? tokenValue = token.value.ToString();
+            if (string.IsNullOrEmpty(tokenValue)) continue;
+            
+            int pos = text.IndexOf(tokenValue, currentPos, StringComparison.Ordinal);
+            if (pos >= 0)
+            {
+                int styleIndex = GetStyleForTokenType(token.type);
+                codeTextBox.StartStyling(pos);
+                codeTextBox.SetStyling(tokenValue.Length, styleIndex);
+                currentPos = pos + tokenValue.Length;
+            }
+        }
+    }
+
+    private void CodeTextBox_StyleNeeded(object? sender, StyleNeededEventArgs e)
+    {
+        if (_tokens != null && _tokens.Count > 0)
+        {
+            ApplyHighlighting();
+        }
     }
 
     private void SetupContextMenu()
     {
         var contextMenu = new ContextMenuStrip();
-        
+
         var copyItem = new ToolStripMenuItem("Копировать");
         copyItem.Click += (s, e) => codeTextBox.Copy();
         copyItem.ShortcutKeys = Keys.Control | Keys.C;
-        
+
         var cutItem = new ToolStripMenuItem("Вырезать");
         cutItem.Click += (s, e) => codeTextBox.Cut();
         cutItem.ShortcutKeys = Keys.Control | Keys.X;
-        
+
         var pasteItem = new ToolStripMenuItem("Вставить");
         pasteItem.Click += (s, e) => codeTextBox.Paste();
         pasteItem.ShortcutKeys = Keys.Control | Keys.V;
-        
+
         var selectAllItem = new ToolStripMenuItem("Выделить все");
         selectAllItem.Click += (s, e) => codeTextBox.SelectAll();
         selectAllItem.ShortcutKeys = Keys.Control | Keys.A;
-        
+
         contextMenu.Items.Add(copyItem);
         contextMenu.Items.Add(cutItem);
         contextMenu.Items.Add(pasteItem);
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add(selectAllItem);
-        
+
         codeTextBox.ContextMenuStrip = contextMenu;
     }
 
-    private void CodeTextBox_TextChanged(object sender, EventArgs e)
+    private void CodeTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (_isHighlighting) return;
-        
-        // Запоминаем текущую позицию курсора и выделение
-        var selectionStart = codeTextBox.SelectionStart;
-        var selectionLength = codeTextBox.SelectionLength;
-        
-        _isHighlighting = true;
-        
-        try
+        if (e.Control)
         {
-            // Подсвечиваем синтаксис
-            HighlightSyntax();
-        }
-        finally
-        {
-            _isHighlighting = false;
-            
-            // Восстанавливаем позицию курсора и выделение
-            codeTextBox.SelectionStart = selectionStart;
-            codeTextBox.SelectionLength = selectionLength;
-            
-            // Сбрасываем цвет выделения
-            codeTextBox.SelectionColor = codeTextBox.ForeColor;
-        }
-    }
-
-    private void HighlightSyntax()
-    {
-        var text = codeTextBox.Text;
-        if (string.IsNullOrEmpty(text)) return;
-        
-        // Сохраняем текущие настройки
-        var originalColor = codeTextBox.SelectionColor;
-        var originalFont = codeTextBox.SelectionFont;
-        
-        // Устанавливаем базовый стиль
-        codeTextBox.Select(0, text.Length);
-        codeTextBox.SelectionColor = Color.Black;
-        codeTextBox.SelectionFont = new Font("Consolas", 10, FontStyle.Regular);
-        
-        // Подсвечиваем ключевые слова
-        foreach (var keyword in _keywords)
-        {
-            var pattern = $@"\b{keyword}\b";
-            var matches = Regex.Matches(text, pattern, RegexOptions.IgnoreCase);
-            
-            foreach (Match match in matches)
+            switch (e.KeyCode)
             {
-                codeTextBox.Select(match.Index, match.Length);
-                codeTextBox.SelectionColor = Color.Blue;
-                codeTextBox.SelectionFont = new Font("Consolas", 10, FontStyle.Bold);
+                case Keys.S:
+                    if (sender != null)
+                        SaveMenuItem_Click(sender, e);
+                    e.Handled = true;
+                    break;
+                case Keys.O:
+                    if (sender != null)
+                        OpenMenuItem_Click(sender, e);
+                    e.Handled = true;
+                    break;
+                case Keys.N:
+                    if (sender != null)
+                        NewMenuItem_Click(sender, e);
+                    e.Handled = true;
+                    break;
+                case Keys.F when e.Shift:
+                    ShowFindDialog();
+                    e.Handled = true;
+                    break;
+                case Keys.F:
+                    if (sender != null)
+                        RefactorButton_Click(sender, e);
+                    e.Handled = true;
+                    break;
             }
-        }
-        
-        // Подсвечиваем строковые литералы (в двойных кавычках)
-        var stringPattern = @"""(?:[^""\\]|\\.)*""";
-        var stringMatches = Regex.Matches(text, stringPattern);
-        foreach (Match match in stringMatches)
-        {
-            codeTextBox.Select(match.Index, match.Length);
-            codeTextBox.SelectionColor = Color.DarkRed;
-            codeTextBox.SelectionFont = new Font("Consolas", 10, FontStyle.Regular);
-        }
-        
-        // Подсвечиваем числовые литералы
-        var numberPattern = @"\b\d+(\.\d+)?\b";
-        var numberMatches = Regex.Matches(text, numberPattern);
-        foreach (Match match in numberMatches)
-        {
-            codeTextBox.Select(match.Index, match.Length);
-            codeTextBox.SelectionColor = Color.DarkGreen;
-            codeTextBox.SelectionFont = new Font("Consolas", 10, FontStyle.Regular);
-        }
-        
-        // Подсвечиваем комментарии (однострочные)
-        var commentPattern = @"//.*";
-        var commentMatches = Regex.Matches(text, commentPattern);
-        foreach (Match match in commentMatches)
-        {
-            codeTextBox.Select(match.Index, match.Length);
-            codeTextBox.SelectionColor = Color.Green;
-            codeTextBox.SelectionFont = new Font("Consolas", 10, FontStyle.Italic);
-        }
-        
-        // Восстанавливаем оригинальный цвет
-        codeTextBox.SelectionColor = originalColor;
-        if (originalFont != null)
-            codeTextBox.SelectionFont = originalFont;
-    }
-
-    private void CodeTextBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        // Отслеживаем состояние Ctrl
-        if (e.KeyCode == Keys.ControlKey)
-        {
-            _ctrlPressed = true;
-        }
-        
-        if (e.KeyCode == Keys.Enter)
-        {
-            HandleEnterKey();
-            e.Handled = true;
-            e.SuppressKeyPress = true;
-        }
-        else if (e.KeyCode == Keys.Back && _ctrlPressed)
-        {
-            // Ctrl+Backspace - удалить предыдущее слово
-            HandleCtrlBackspace();
-            e.Handled = true;
-            e.SuppressKeyPress = true;
-        }
-        else if (e.KeyCode == Keys.Delete && _ctrlPressed)
-        {
-            // Ctrl+Delete - удалить следующее слово
-            HandleCtrlDelete();
-            e.Handled = true;
-            e.SuppressKeyPress = true;
-        }
-        else if (e.KeyCode == Keys.Back)
-        {
-            // Обычный Backspace с проверкой отступа
-            if (HandleSmartBackspace())
-            {
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-            }
-        }
-        else if (e.KeyCode == Keys.Delete)
-        {
-            // Обычный Delete с проверкой отступа
-            if (HandleSmartDelete())
-            {
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-            }
-        }
-        else if (e.KeyCode == Keys.Tab)
-        {
-            // Tab - добавить отступ
-            HandleTabKey();
-            e.Handled = true;
-            e.SuppressKeyPress = true;
-        }
-        else if (e.KeyCode == Keys.S && _ctrlPressed)
-        {
-            // Ctrl+S - сохранить
-            SaveMenuItem_Click(sender, e);
-            e.Handled = true;
-        }
-        else if (e.KeyCode == Keys.O && _ctrlPressed)
-        {
-            // Ctrl+O - открыть
-            OpenMenuItem_Click(sender, e);
-            e.Handled = true;
-        }
-        else if (e.KeyCode == Keys.N && _ctrlPressed)
-        {
-            // Ctrl+N - новый файл
-            NewMenuItem_Click(sender, e);
-            e.Handled = true;
-        }
-        else if (e.KeyCode == Keys.F && _ctrlPressed)
-        {
-            // Ctrl+F - форматирование
-            RefactorButton_Click(sender, e);
-            e.Handled = true;
-        }
-        else if (e.KeyCode == Keys.F5)
-        {
-            // F5 - запуск
-            RunButton_Click(sender, e);
-            e.Handled = true;
-        }
-        else if (e.KeyCode == Keys.F6)
-        {
-            // F6 - компиляция
-            CompileButton_Click(sender, e);
-            e.Handled = true;
-        }
-    }
-
-    private void CodeTextBox_KeyUp(object sender, KeyEventArgs e)
-    {
-        // Сбрасываем состояние Ctrl
-        if (e.KeyCode == Keys.ControlKey)
-        {
-            _ctrlPressed = false;
-        }
-    }
-
-    private void HandleEnterKey()
-    {
-        var currentPos = codeTextBox.SelectionStart;
-        var text = codeTextBox.Text;
-
-        // Находим начало текущей строки
-        var lineStart = currentPos;
-        while (lineStart > 0 && text[lineStart - 1] != '\n')
-            lineStart--;
-
-        // Получаем текущую строку до курсора
-        var currentLine = text.Substring(lineStart, currentPos - lineStart);
-
-        // Находим отступ текущей строки
-        var baseIndent = "";
-        for (var i = 0; i < currentLine.Length; i++)
-        {
-            if (currentLine[i] != ' ' && currentLine[i] != '\t')
-                break;
-            baseIndent += currentLine[i];
-        }
-
-        // Определяем, нужно ли увеличивать отступ
-        var increaseIndent = ShouldIncreaseIndent(currentLine.Trim());
-        var decreaseIndent = ShouldDecreaseIndent(currentLine.Trim());
-
-        // Определяем отступ для новой строки
-        var newIndent = baseIndent;
-
-        if (increaseIndent)
-            // Увеличиваем отступ для if, while, for, def и т.д.
-            newIndent += new string(' ', 2);
-        else if (decreaseIndent && baseIndent.Length >= 2)
-            // Уменьшаем отступ после закрывающей скобки
-            newIndent = baseIndent.Substring(0, baseIndent.Length - 2);
-
-        // Вставляем новую строку
-        codeTextBox.Text = text.Insert(currentPos, "\n" + newIndent);
-        codeTextBox.SelectionStart = currentPos + 1 + newIndent.Length;
-    }
-
-   private bool HandleSmartBackspace()
-{
-    var currentPos = codeTextBox.SelectionStart;
-    var text = codeTextBox.Text;
-    
-    if (currentPos == 0) return false;
-    
-    // Находим начало текущей строки
-    var lineStart = currentPos;
-    while (lineStart > 0 && text[lineStart - 1] != '\n')
-        lineStart--;
-    
-    // Получаем текущую строку от начала до курсора
-    var lineToCursor = text.Substring(lineStart, currentPos - lineStart);
-    
-    // Случай 1: Курсор в самом начале строки (сразу после \n)
-    if (currentPos == lineStart && lineStart > 0)
-    {
-        // Удаляем символ новой строки - курсор перейдет в конец предыдущей строки
-        codeTextBox.Text = text.Remove(lineStart - 1, 1);
-        codeTextBox.SelectionStart = lineStart - 1;
-        return true;
-    }
-    
-    // Случай 2: В строке только пробелы/табы (пустая строка с отступами)
-    var isOnlyWhitespace = true;
-    for (var i = 0; i < lineToCursor.Length; i++)
-    {
-        if (lineToCursor[i] != ' ' && lineToCursor[i] != '\t')
-        {
-            isOnlyWhitespace = false;
-            break;
-        }
-    }
-    
-    if (isOnlyWhitespace && lineToCursor.Length > 0)
-    {
-        // Удаляем отступ кратно 2 пробелам
-        var indentToRemove = 2;
-        if (lineToCursor.Length >= indentToRemove)
-        {
-            // Удаляем 2 пробела
-            var charsToRemove = Math.Min(indentToRemove, lineToCursor.Length);
-            codeTextBox.Text = text.Remove(currentPos - charsToRemove, charsToRemove);
-            codeTextBox.SelectionStart = currentPos - charsToRemove;
         }
         else
         {
-            // Если отступ меньше 2 пробелов, удаляем все и символ новой строки
-            var charsToRemove = lineToCursor.Length;
-            codeTextBox.Text = text.Remove(currentPos - charsToRemove, charsToRemove);
-            codeTextBox.SelectionStart = currentPos - charsToRemove;
+            switch (e.KeyCode)
+            {
+                case Keys.F5:
+                    if (sender != null)
+                        RunButton_Click(sender, e);
+                    e.Handled = true;
+                    break;
+                case Keys.F6:
+                    if (sender != null)
+                        CompileButton_Click(sender, e);
+                    e.Handled = true;
+                    break;
+            }
+        }
+    }
+
+    private void ClearErrorMarkers()
+    {
+        // Используем MarkerDeleteAll с номером маркера
+        codeTextBox.MarkerDeleteAll(0);
+    }
+
+    private void AddErrorMarker(int lineNumber)
+    {
+        if (lineNumber >= 0 && lineNumber < codeTextBox.Lines.Count)
+        {
+            // В некоторых версиях ScintillaNET используется MarkerAdd(line, markerNumber)
+            // Но если не работает, можно использовать альтернативный подход:
+            codeTextBox.Lines[lineNumber].MarkerAdd(0);
+        }
+    }
+
+    private void HighlightError(Position pos)
+    {
+        if (pos == null) return;
+        
+        int scintillaLine = pos.Line - 1;
+        int column = pos.Column - 1;
+        
+        if (scintillaLine >= 0 && scintillaLine < codeTextBox.Lines.Count)
+        {
+            AddErrorMarker(scintillaLine);
+
+            var line = codeTextBox.Lines[scintillaLine];
+            int position = line.Position + Math.Max(0, column);
+
+            codeTextBox.CurrentPosition = position;
+            codeTextBox.ScrollCaret();
+        }
+    }
+
+    private void SimpleFind(string searchText, bool matchCase, bool wholeWord)
+    {
+        if (string.IsNullOrEmpty(searchText)) return;
+        
+        string text = codeTextBox.Text;
+        int startPos = codeTextBox.CurrentPosition;
+        
+        StringComparison comparison = matchCase ? 
+            StringComparison.Ordinal : 
+            StringComparison.OrdinalIgnoreCase;
+        
+        int foundPos = text.IndexOf(searchText, startPos, comparison);
+        
+        if (foundPos >= 0)
+        {
+            codeTextBox.SetSelection(foundPos, foundPos + searchText.Length);
+            codeTextBox.ScrollCaret();
+        }
+        else
+        {
+            foundPos = text.IndexOf(searchText, 0, comparison);
+            if (foundPos >= 0)
+            {
+                codeTextBox.SetSelection(foundPos, foundPos + searchText.Length);
+                codeTextBox.ScrollCaret();
+            }
+            else
+            {
+                MessageBox.Show("Текст не найден", "Поиск", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+    }
+
+    private void ShowFindDialog()
+    {
+        using (var dialog = new Form())
+        {
+            dialog.Text = "Найти";
+            dialog.Size = new Size(350, 180);
+            dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dialog.MaximizeBox = false;
+            dialog.MinimizeBox = false;
+            dialog.StartPosition = FormStartPosition.CenterParent;
+
+            var lblSearch = new Label() { Text = "Найти:", Location = new Point(10, 20), Size = new Size(50, 25) };
+            var txtSearch = new TextBox() { Location = new Point(70, 20), Size = new Size(250, 25) };
             
-            // Теперь курсор в начале строки, можно удалить \n если он есть
-            if (codeTextBox.SelectionStart > 0 && codeTextBox.Text[codeTextBox.SelectionStart - 1] == '\n')
-            {
-                codeTextBox.Text = codeTextBox.Text.Remove(codeTextBox.SelectionStart - 1, 1);
-                codeTextBox.SelectionStart--;
-            }
+            var chkMatchCase = new CheckBox() { Text = "Учитывать регистр", Location = new Point(70, 50), Size = new Size(150, 25) };
+            var chkWholeWord = new CheckBox() { Text = "Только слово целиком", Location = new Point(70, 75), Size = new Size(150, 25) };
+            
+            var btnFind = new Button() { Text = "Найти далее", Location = new Point(120, 110), Size = new Size(100, 30) };
+
+            btnFind.Click += (s, e) => {
+                SimpleFind(txtSearch.Text, chkMatchCase.Checked, chkWholeWord.Checked);
+            };
+
+            dialog.Controls.Add(lblSearch);
+            dialog.Controls.Add(txtSearch);
+            dialog.Controls.Add(chkMatchCase);
+            dialog.Controls.Add(chkWholeWord);
+            dialog.Controls.Add(btnFind);
+
+            dialog.AcceptButton = btnFind;
+            dialog.ShowDialog(this);
         }
-        return true;
-    }
-    
-    return false;
-}
-
-    private bool HandleSmartDelete()
-    {
-        var currentPos = codeTextBox.SelectionStart;
-        var text = codeTextBox.Text;
-        
-        if (currentPos >= text.Length) return false; // В конце текста
-        
-        // Проверяем, находимся ли мы на отступе в начале строки
-        var lineEnd = currentPos;
-        while (lineEnd < text.Length && text[lineEnd] != '\n')
-            lineEnd++;
-        
-        // Получаем текст от курсора до конца строки
-        var lineFromCursor = text.Substring(currentPos, lineEnd - currentPos);
-        
-        // Проверяем, состоит ли текст после курсора только из пробелов/табов
-        var isOnlyWhitespace = true;
-        for (var i = 0; i < lineFromCursor.Length; i++)
-        {
-            if (lineFromCursor[i] != ' ' && lineFromCursor[i] != '\t')
-            {
-                isOnlyWhitespace = false;
-                break;
-            }
-        }
-        
-        if (isOnlyWhitespace && lineFromCursor.Length > 0)
-        {
-            // Удаляем отступ кратно 2 пробелам
-            var indentToRemove = 2;
-            if (lineFromCursor.Length >= indentToRemove)
-            {
-                // Удаляем 2 пробела (или все, если меньше 2)
-                var charsToRemove = Math.Min(indentToRemove, lineFromCursor.Length);
-                codeTextBox.Text = text.Remove(currentPos, charsToRemove);
-                codeTextBox.SelectionStart = currentPos;
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    private void HandleCtrlBackspace()
-    {
-        var currentPos = codeTextBox.SelectionStart;
-        var text = codeTextBox.Text;
-        
-        if (currentPos == 0) return;
-        
-        // Ищем начало слова
-        var startPos = currentPos - 1;
-        
-        // Пропускаем пробелы/табы
-        while (startPos >= 0 && char.IsWhiteSpace(text[startPos]))
-            startPos--;
-        
-        // Ищем начало слова (не буквенно-цифровые символы или начало текста)
-        while (startPos >= 0 && !char.IsWhiteSpace(text[startPos]) && 
-               (char.IsLetterOrDigit(text[startPos]) || text[startPos] == '_'))
-            startPos--;
-        
-        startPos++; // Корректируем позицию
-        
-        if (startPos < currentPos)
-        {
-            // Удаляем слово
-            codeTextBox.Text = text.Remove(startPos, currentPos - startPos);
-            codeTextBox.SelectionStart = startPos;
-        }
-    }
-
-    private void HandleCtrlDelete()
-    {
-        var currentPos = codeTextBox.SelectionStart;
-        var text = codeTextBox.Text;
-        
-        if (currentPos >= text.Length) return;
-        
-        // Ищем конец слова
-        var endPos = currentPos;
-        
-        // Пропускаем пробелы/табы
-        while (endPos < text.Length && char.IsWhiteSpace(text[endPos]))
-            endPos++;
-        
-        // Ищем конец слова (буквенно-цифровые символы или подчеркивания)
-        while (endPos < text.Length && !char.IsWhiteSpace(text[endPos]) && 
-               (char.IsLetterOrDigit(text[endPos]) || text[endPos] == '_'))
-            endPos++;
-        
-        if (endPos > currentPos)
-        {
-            // Удаляем слово
-            codeTextBox.Text = text.Remove(currentPos, endPos - currentPos);
-            codeTextBox.SelectionStart = currentPos;
-        }
-    }
-
-    private void HandleTabKey()
-    {
-        var currentPos = codeTextBox.SelectionStart;
-        var text = codeTextBox.Text;
-        
-        // Вставляем 2 пробела (стандартный отступ)
-        codeTextBox.Text = text.Insert(currentPos, "  ");
-        codeTextBox.SelectionStart = currentPos + 2;
-    }
-
-    private bool ShouldIncreaseIndent(string line)
-    {
-        // Проверяем, заканчивается ли строка на символы, требующие увеличения отступа
-        return line.EndsWith("{") ||
-               line.EndsWith("then") ||
-               line.EndsWith("do") ||
-               (line.Contains("def ") && !line.Contains("{"));
-    }
-
-    private bool ShouldDecreaseIndent(string line)
-    {
-        // Проверяем, начинается ли строка с символов, требующих уменьшения отступа
-        return line.StartsWith("}") ||
-               line.StartsWith("else") ||
-               line.StartsWith("} else");
     }
 
     public void ChangeOutputBoxText(string text)
@@ -512,6 +443,7 @@ public partial class CompilerForm : Form
             outputTextBox.Text = "";
         }
     }
+
     private void MainForm_Load(object sender, EventArgs e)
     {
         outputTextBox.BackColor = Color.LightGray;
@@ -519,51 +451,58 @@ public partial class CompilerForm : Form
         outputTextBox.Font = new Font("Consolas", 10);
     }
 
-    // Меню: Новый файл
     private void NewMenuItem_Click(object sender, EventArgs e)
     {
-        codeTextBox.Clear();
-        outputTextBox.Clear();
+        codeTextBox.Text = "";
+        outputTextBox.Text = "";
+        ClearErrorMarkers();
     }
 
-    // Меню: Открыть файл
     private void OpenMenuItem_Click(object sender, EventArgs e)
     {
         using (var openDialog = new OpenFileDialog())
         {
             openDialog.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
-            if (openDialog.ShowDialog() == DialogResult.OK) 
+            openDialog.Title = "Открыть файл с кодом";
+            
+            if (openDialog.ShowDialog() == DialogResult.OK)
             {
                 codeTextBox.Text = File.ReadAllText(openDialog.FileName);
-                // После загрузки файла подсвечиваем синтаксис
-                HighlightSyntax();
+                ClearErrorMarkers();
+                outputTextBox.Text = $"Файл загружен: {openDialog.FileName}\n";
             }
         }
     }
 
-    // Меню: Сохранить файл
     private void SaveMenuItem_Click(object sender, EventArgs e)
     {
         using (var saveDialog = new SaveFileDialog())
         {
             saveDialog.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
-            if (saveDialog.ShowDialog() == DialogResult.OK) 
+            saveDialog.Title = "Сохранить файл с кодом";
+            saveDialog.DefaultExt = "txt";
+            
+            if (saveDialog.ShowDialog() == DialogResult.OK)
+            {
                 File.WriteAllText(saveDialog.FileName, codeTextBox.Text);
+                outputTextBox.Text = $"Файл сохранен: {saveDialog.FileName}\n";
+            }
         }
     }
 
     private void PrepareBeforeCompilation()
     {
         outputTextBox.Clear();
+        ClearErrorMarkers();
         SymbolTree.Reset();
         SemanticCheckVisitor.Reset();
     }
-    
-    // Кнопка компиляции
+
     private void CompileButton_Click(object sender, EventArgs e)
     {
         var lex = new Lexer(codeTextBox.Text);
         PrepareBeforeCompilation();
+
         try
         {
             var parser = new Parser(lex);
@@ -571,78 +510,87 @@ public partial class CompilerForm : Form
             var sv = new SemanticCheckVisitor();
             progr.VisitP(sv);
 
-            outputTextBox.Text = "Компиляция завершена! Ошибок: 0 \n";
+            outputTextBox.Text = "✅ Компиляция завершена! Ошибок: 0\n";
         }
         catch (CompilerExceptions.BaseCompilerException ex)
         {
-            outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+            string errorText = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+            outputTextBox.Text = errorText;
+            
+            if (ex.Pos != null)
+            {
+                HighlightError(ex.Pos);
+            }
         }
     }
 
-    // Кнопка запуска
-    private async void RunButton_Click(object sender, EventArgs e)
+    private void RunButton_Click(object sender, EventArgs e)
     {
         var lex = new Lexer(codeTextBox.Text);
         PrepareBeforeCompilation();
+
         try
         {
-            
-            
             var parser = new Parser(lex);
             var progr = parser.MainProgram();
-            #if DEBUG
+
+#if DEBUG
             ASTPrinter.PrintAST(progr);
-            #endif
-            
+#endif
+
             var sv = new SemanticCheckVisitor();
             progr.VisitP(sv);
             SymbolTree.PrintNamespaceTree(SymbolTree.Global);
-     
-            var frame_gen = new FrameSizeVisitor(); 
+
+            var frame_gen = new FrameSizeVisitor();
             progr.VisitP(frame_gen);
 
             var gen = new ThreeAddressCodeVisitor();
             gen.GiveFrameSizes(frame_gen.GetFrameSizes());
             progr.VisitP(gen);
 
-            //var framesize = frame_gen.GetFrameSizes();
-            #if DEBUG
+#if DEBUG
             frame_gen.PrintFrameSizes();
-            #endif
+#endif
+
             VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
             var code = gen.GetCode();
-            
-            #if DEBUG
-            GetDebugCodeAsMarkdownTable(code,"../../../DebugFile.md");
-            #endif
+
+#if DEBUG
+            GetDebugCodeAsMarkdownTable(code, "../../../DebugFile.md");
+#endif
+
             VirtualMachine.LoadProgram(code);
             VirtualMachine.MemoryDump(1000);
-            
+
             var sw = new Stopwatch();
             sw.Start();
             VirtualMachine.Run();
             sw.Stop();
-            
-            // foreach (var VARIABLE in frame_gen.GetFrameSizes()) 
-            //     Console.WriteLine(VARIABLE.Key + " " + VARIABLE.Value);
-            //
-            // foreach (var VARIABLE in gen._currentTempIndexes) 
-            //     Console.WriteLine(VARIABLE.Key + " " + VARIABLE.Value);
 
-            Instance.ChangeOutputBoxText($"Programm elapsed time: {sw.Elapsed}\n");
+            if (Instance != null)
+            {
+                Instance.ChangeOutputBoxText($"⏱️ Время выполнения: {sw.Elapsed}\n");
+            }
             VirtualMachine.MemoryDump(1000);
             VirtualMachine.ResetVirtualMachine();
         }
         catch (CompilerExceptions.BaseCompilerException ex)
         {
-            outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+            string errorText = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+            outputTextBox.Text = errorText;
+            
+            if (ex.Pos != null)
+            {
+                HighlightError(ex.Pos);
+            }
         }
     }
 
-    // Кнопка рефакторинга
     private void RefactorButton_Click(object sender, EventArgs e)
     {
         var lex = new Lexer(codeTextBox.Text);
+        ClearErrorMarkers();
 
         try
         {
@@ -650,30 +598,27 @@ public partial class CompilerForm : Form
             var progr = parser.MainProgram();
             var pp = new FormatCodeVisitor();
             codeTextBox.Text = progr.Visit(pp);
-            
-            // После форматирования подсвечиваем синтаксис
-            HighlightSyntax();
-            
-            outputTextBox.Text = "Код отформатирован!";
-        }
-        catch (CompilerExceptions.LexerException ex)
-        {
-            outputTextBox.Text =
-                "Lex ERROR:" + CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+
+            outputTextBox.Text = "✅ Код отформатирован!\n";
         }
         catch (CompilerExceptions.BaseCompilerException ex)
         {
-            outputTextBox.Text = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+            string errorText = CompilerExceptions.OutPutError(ex.GetType().ToString(), ex, lex.GetLines());
+            outputTextBox.Text = errorText;
+            
+            if (ex.Pos != null)
+            {
+                HighlightError(ex.Pos);
+            }
         }
     }
-    
-    public string GetDebugCodeAsMarkdownTable(List<ThreeAddr> allCode,string filePath = null)
+
+    public string GetDebugCodeAsMarkdownTable(List<ThreeAddr> allCode, string filePath = null)
     {
         var sb = new StringBuilder();
-        // Заголовки из полей ThreeAddr
         sb.AppendLine("| # | BValue | IValue | Label | MemIndex | Op1Index | Op2Index | RValue | Type | command | isInDirectAddressing1 | isInDirectAddressing2 | isInDirectAddressing3 |");
         sb.AppendLine("|---|--------|--------|-------|----------|----------|----------|--------|------|---------|----------------------|----------------------|----------------------|");
-    
+
         int index = 0;
         foreach (var instruction in allCode)
         {
@@ -682,73 +627,103 @@ public partial class CompilerForm : Form
             string rValue = instruction.RValue.ToString();
             string label = instruction.Label ?? "null";
             string type = instruction.Type.ToString();
-        
+
             sb.AppendLine($"| {index} | {bValue} | {iValue} | {label} | {instruction.MemIndex} | {instruction.Op1Index} | {instruction.Op2Index} | {rValue} | {type} | {instruction.command} | {instruction.isInDirectAddressing1} | {instruction.isInDirectAddressing2} | {instruction.isInDirectAddressing3} |");
-        
+
             index++;
         }
-    
+
         string result = sb.ToString();
-    
-        // Сохраняем в файл, если указан путь
+
         if (!string.IsNullOrEmpty(filePath))
         {
             File.WriteAllText(filePath, result);
         }
-    
+
         return result;
     }
-    
+
 #if DEBUG
     private void button1_Click(object sender, EventArgs e)
     {
         ClearOutputBoxText();
-        ChangeOutputBoxText("Debugging started!");
+        ChangeOutputBoxText("🔍 Режим отладки запущен!\n");
         PrepareBeforeCompilation();
-        var lex = new Lexer(codeTextBox.Text);
-        var parser = new Parser(lex);
-        var progr = parser.MainProgram();
-        //SymbolTree.PrintNamespaceTree(SymbolTree.Global);
+        
+        try
+        {
+            var lex = new Lexer(codeTextBox.Text);
+            var parser = new Parser(lex);
+            var progr = parser.MainProgram();
 
-        ASTPrinter.PrintAST(progr);
+            ASTPrinter.PrintAST(progr);
 
-        var sv = new SemanticCheckVisitor();
-        progr.VisitP(sv);
-        SymbolTree.PrintNamespaceTree(SymbolTree.Global);
-     
-        var frame_gen = new FrameSizeVisitor();
-        progr.VisitP(frame_gen);
+            var sv = new SemanticCheckVisitor();
+            progr.VisitP(sv);
+            SymbolTree.PrintNamespaceTree(SymbolTree.Global);
 
-        var gen = new ThreeAddressCodeVisitor();
-        gen.GiveFrameSizes(frame_gen.GetFrameSizes());
-        progr.VisitP(gen);
+            var frame_gen = new FrameSizeVisitor();
+            progr.VisitP(frame_gen);
 
-        //var framesize = frame_gen.GetFrameSizes();
+            var gen = new ThreeAddressCodeVisitor();
+            gen.GiveFrameSizes(frame_gen.GetFrameSizes());
+            progr.VisitP(gen);
 
-        VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
-        var code = gen.GetCode();
+            VirtualMachine.GiveFrameSize(gen.GetFrameSizes());
+            var code = gen.GetCode();
 
-        GetDebugCodeAsMarkdownTable(code,"../../../DebugFile.md");
+            GetDebugCodeAsMarkdownTable(code, "../../../DebugFile.md");
 
-        VirtualMachine.LoadProgram(code);
-        VirtualMachine.StartDebug();
+            VirtualMachine.LoadProgram(code);
+            VirtualMachine.StartDebug();
+            
+            outputTextBox.AppendText("Отладчик готов. Используйте кнопки управления.\n");
+        }
+        catch (Exception ex)
+        {
+            outputTextBox.Text = $"Ошибка при запуске отладчика: {ex.Message}\n";
+        }
     }
 
     private void button2_Click(object sender, EventArgs e)
     {
-        VirtualMachine.Continue();
+        try
+        {
+            VirtualMachine.Continue();
+            outputTextBox.AppendText("▶ Продолжение выполнения...\n");
+        }
+        catch (Exception ex)
+        {
+            outputTextBox.AppendText($"Ошибка: {ex.Message}\n");
+        }
     }
+
     private void button3_Click(object sender, EventArgs e)
     {
-        ClearOutputBoxText();
-        VirtualMachine.StepNext();
-        
+        try
+        {
+            ClearOutputBoxText();
+            VirtualMachine.StepNext();
+            outputTextBox.AppendText("⏩ Шаг выполнения\n");
+        }
+        catch (Exception ex)
+        {
+            outputTextBox.AppendText($"Ошибка: {ex.Message}\n");
+        }
     }
 
     private void button4_Click(object sender, EventArgs e)
     {
-        ChangeOutputBoxText("Debugging stopped!");
-        VirtualMachine.Stop();
+        try
+        {
+            ChangeOutputBoxText("⏹ Отладка остановлена!\n");
+            VirtualMachine.Stop();
+            VirtualMachine.ResetVirtualMachine();
+        }
+        catch (Exception ex)
+        {
+            outputTextBox.AppendText($"Ошибка: {ex.Message}\n");
+        }
     }
 #endif
 }

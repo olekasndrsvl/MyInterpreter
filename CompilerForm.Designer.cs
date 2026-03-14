@@ -1,4 +1,6 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
+using System.Windows.Forms;
+using ScintillaNET;
 
 namespace MyInterpreter;
 
@@ -31,7 +33,8 @@ partial class CompilerForm
                 runButton = new System.Windows.Forms.Button();
                 refactorButton = new System.Windows.Forms.Button();
                 splitContainer = new System.Windows.Forms.SplitContainer();
-                codeTextBox = new System.Windows.Forms.RichTextBox();
+                // Replaced RichTextBox with ScintillaNET editor for MVP
+                codeTextBox = new ScintillaNET.Scintilla();
                 outputTextBox = new System.Windows.Forms.RichTextBox();
                 button1 = new System.Windows.Forms.Button();
                 button2 = new System.Windows.Forms.Button();
@@ -260,7 +263,7 @@ partial class CompilerForm
             private Button runButton;
             private System.Windows.Forms.Button refactorButton;
             private SplitContainer splitContainer;
-            private RichTextBox codeTextBox;
+            private Scintilla codeTextBox;
             private RichTextBox outputTextBox;
         
         
