@@ -590,10 +590,10 @@ public partial class CompilerForm : Form
             
             var parser = new Parser(lex);
             var progr = parser.MainProgram();
-            //SymbolTree.PrintNamespaceTree(SymbolTree.Global);
             #if DEBUG
             ASTPrinter.PrintAST(progr);
             #endif
+            
             var sv = new SemanticCheckVisitor();
             progr.VisitP(sv);
             SymbolTree.PrintNamespaceTree(SymbolTree.Global);

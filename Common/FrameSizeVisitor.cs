@@ -30,6 +30,13 @@ public class FrameSizeVisitor : IVisitorP
     }
 
     public void VisitNode(Node node) { }
+    public void VisitTypeNode(TypeNode tpn){ }
+    public void VisitIntTypeNode(IntTypeNode itn){}
+   
+    public void VisitBoolTypeNode(BoolTypeNode btn){}
+    public void VisitDoubleTypeNode(DoubleTypeNode dtn){}
+    
+
     public void VisitDefinitionNode(DefinitionNode defNode) { }
     public void VisitExprNode(ExprNode node) { }
     public void VisitStatementNode(StatementNode node) { }

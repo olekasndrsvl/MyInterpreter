@@ -103,21 +103,20 @@ public class ThreeAddressCodeVisitor : IVisitorP
 
     public Dictionary<string, int> LabelAddresses { get; } = new();
 
-    public void VisitNode(Node node)
-    {
-    }
+    public void VisitNode(Node node) { }
 
-    public void VisitDefinitionNode(DefinitionNode defNode)
-    {
-    }
+    public void VisitTypeNode(TypeNode tpn) { }
+    public void VisitIntTypeNode(IntTypeNode itn) { }
 
-    public void VisitExprNode(ExprNode node)
-    {
-    }
+    public void VisitBoolTypeNode(BoolTypeNode btn) { }
 
-    public void VisitStatementNode(StatementNode node)
-    {
-    }
+    public void VisitDoubleTypeNode(DoubleTypeNode dtn) { }
+
+    public void VisitDefinitionNode(DefinitionNode defNode) { }
+
+    public void VisitExprNode(ExprNode node) { }
+
+    public void VisitStatementNode(StatementNode node) { }
 
     public void VisitBinOp(BinOpNode bin)
     {

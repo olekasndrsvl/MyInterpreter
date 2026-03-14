@@ -182,6 +182,7 @@ public enum TokenType
     Eof, 
     tkTrue, tkFalse, tkIf, tkThen, tkElse, tkWhile, tkDo, tkFor,
     tkDef,  tkReturn, tkVar,
+    tkInt, tkBool, tkDbl,
 }
 
 
@@ -212,6 +213,9 @@ public partial class Lexer : LexerBase<TokenType>
         ["def"] = TokenType.tkDef,
         ["return"] = TokenType.tkReturn,
         ["var"] = TokenType.tkVar,
+        ["integer"] = TokenType.tkInt,
+        ["bool"] = TokenType.tkBool,
+        ["double"] = TokenType.tkDbl,
     };
 
     private TokenT<TokenType> previousToken = null;
@@ -333,6 +337,9 @@ public partial class Lexer : LexerBase<TokenType>
                 break;
             case '{':
                 result = new TokenT<TokenType>(TokenType.LBrace, startPos, "{");
+                break;
+            case ':':
+                result = new TokenT<TokenType>(TokenType.Colon, startPos, ":");
                 break;
             case ';':
                 result = new TokenT<TokenType>(TokenType.Semicolon, startPos, ";");

@@ -1,0 +1,21 @@
+def f(integer : a)
+  {
+  return 12;
+    };
+  
+def f(bool : x)
+  {
+return 12.5;
+    };
+def factor(x)
+  {
+    if(x>10) then
+      return 1;
+    return factor(x+1)*2;
+    }
+{
+  var x = f(1);
+  print(x);
+  print(f(x<2));
+  print(factor(2));
+  }

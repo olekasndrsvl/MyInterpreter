@@ -1,0 +1,14 @@
+def f(integer : a)
+  {
+    
+    };
+  
+def f(bool : x)
+  {
+    
+    };
+  
+{
+  
+  print(1);
+  }

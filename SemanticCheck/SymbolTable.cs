@@ -171,11 +171,11 @@ public class FunctionSpecialization
 }
 
 // Информация о функции
-public class FunctionInfo(FuncDefNode definition = null)
+public class FunctionInfo(FuncDefNode definition = null, bool isTemplate = true)
 {
     public FuncDefNode Definition { get; set; } = definition;
     public List<FunctionSpecialization> Specializations { get; set; } = new();
-
+    public readonly bool IsTemplateFunction = isTemplate;
     public FunctionSpecialization FindOrCreateSpecialization(SemanticType[] parameterTypes)
     {
         // Проверяем существующие специализации
@@ -197,7 +197,7 @@ public class FunctionInfo(FuncDefNode definition = null)
                 }
 
         //Console.WriteLine($"Created spec for {functionName} with pars: {string.Join(' ',parameterTypes)}");
-        
+      
         // Создаем новую специализацию
         var newSpec = new FunctionSpecialization(parameterTypes, this)
         {
@@ -222,7 +222,16 @@ public class FunctionInfo(FuncDefNode definition = null)
 
         return newSpec;
     }
-
+    public FunctionSpecialization FindSpecialization(SemanticType[] parameterTypes)
+    {
+        // Проверяем существующие специализации
+        foreach (var spec in Specializations)
+            if (AreParameterTypesCompatible(spec.ParameterTypes, parameterTypes))
+                return spec;
+    
+        // Если ничего не найдено, возвращаем null
+        return null;
+    }
     private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
     {
         if (paramTypes.Length != argTypes.Length)

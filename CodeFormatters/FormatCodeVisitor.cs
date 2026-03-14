@@ -26,6 +26,22 @@ public class FormatCodeVisitor : IVisitor<string>
     }
 
     public string VisitNode(Node n) => n.Visit(this);
+    public string VisitTypeNode(TypeNode tpn) => tpn.Visit(this);
+    public string VisitIntTypeNode(IntTypeNode itn)
+    {
+        return "integer";
+    }
+
+    public string VisitBoolTypeNode(BoolTypeNode btn)
+    {
+        return "bool";
+    }
+
+    public string VisitDoubleTypeNode(DoubleTypeNode dtn)
+    {
+        return "double";
+    }
+
     public string VisitDefinitionNode(DefinitionNode def) => def.Visit(this);
     public string VisitExprNode(ExprNode ex) => ex.Visit(this);
     public string VisitStatementNode(StatementNode st) => st.Visit(this);
