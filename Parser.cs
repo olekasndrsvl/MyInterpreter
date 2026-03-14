@@ -77,7 +77,7 @@ public abstract class ParserBase<TokenType>
 // FunDefList := FuncDef+
 // StatementList := Statement (';' Statement)*
 // Statement := Assign | ProcCall | IfStatement | WhileStatement | ForStatement | BlockStatement | ReturnStatement
-// FuncDef := def Id '(' IdList ')' Statement | def Id '(' TypedIdList ')' Statement
+// FuncDef := def Id '(' IdList ')' Statement | def Id '(' TypedIdList ')' Statement | | def Id '(' TypedIdList ')' : TypeNode Statement
 // Assign := Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
 // VarAssign := var Id = Expr
 // ProcCall := Id '(' ExprList ')
@@ -148,6 +148,7 @@ public class Parser : ParserBase<TokenType>
         List<IdNode> parameters = new List<IdNode>();
 
         bool typed = false;
+        bool returnTyped = false;
         if (At(TokenType.tkInt) || At(TokenType.tkDbl) || At(TokenType.tkBool))
         {
             typed = true;
@@ -157,10 +158,22 @@ public class Parser : ParserBase<TokenType>
             parameters = IdList();
         
         Requires(TokenType.RPar);
+
+        if (At(TokenType.Colon))
+        {
+            Requires(TokenType.Colon);
+            returnTyped = true;
+            var returnType = TypeIdNode();
+            var bodyReturn = Statement();
+            var result = new FuncDefNode(name, parameters, bodyReturn, typed, returnTyped,
+                new Position(lex.GetLineNumber(), pos));
+            result.ReturnType = returnType.Type;
+            return result;
+        }
         
         var body = Statement();
         
-        return new FuncDefNode(name, parameters, body, typed,new Position(lex.GetLineNumber(), pos));
+        return new FuncDefNode(name, parameters, body, typed,returnTyped,new Position(lex.GetLineNumber(), pos));
     }
 
     public DefinitionsListNode DefinitionList()

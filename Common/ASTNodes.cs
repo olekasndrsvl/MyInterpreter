@@ -842,18 +842,20 @@ public class FuncDefNode : DefinitionNode
     {
     }
 
-    public FuncDefNode(IdNode Name, List<IdNode> Params, StatementNode Body, bool isClearTyped = false,Position p = null)
+    public FuncDefNode(IdNode Name, List<IdNode> Params, StatementNode Body, bool isClearTyped = false, bool isReturnTypeDeclared = false,Position p = null)
     {
         this.Name = Name;
         this.Params = Params;
         this.Body = Body;
         Pos = p;
         IsClearTypes = isClearTyped;
+        IsReturnTypeDeclared = isReturnTypeDeclared;
     }
 
     public IdNode Name { get; set; }
     public List<IdNode> Params { get; set; }
     public bool IsClearTypes = false;
+    public bool IsReturnTypeDeclared = false;
     public StatementNode Body { get; set; }
     public SemanticType ReturnType { get; set; }
 
@@ -885,6 +887,7 @@ public class FuncDefNode : DefinitionNode
             clonedParams,
             (StatementNode)Body?.Clone(),
             IsClearTypes,
+            IsReturnTypeDeclared,
             Pos?.Clone() as Position
         )
         {

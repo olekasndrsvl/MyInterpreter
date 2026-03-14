@@ -255,23 +255,35 @@ public class SemanticCheckVisitor : AutoVisitor
         CurrentCheckingFunctionSpecialization.Push(funcSpec);
         _currentNamespace = funcSpec.NameSpace;
         var returnTypes = new List<SemanticType>();
-        if(FunctionTable[node.Name.Name].IsTemplateFunction)
-            CollectReturnTypes(FunctionTable[node.Name.Name].Definition.Body, returnTypes);
-        else
-            CollectReturnTypes(funcSpec.Definition.Body, returnTypes);
-        // Выводим тип возвращаемого значения
-        if (returnTypes.Count > 0)
+
+        if (funcSpec.Definition != null && funcSpec.Definition.IsReturnTypeDeclared)
         {
-            // Находим общий тип всех return statements
-            var inferredReturnType = returnTypes[0];
-            for (var i = 1; i < returnTypes.Count; i++)
-                inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
-            funcSpec.ReturnType = inferredReturnType;
+            funcSpec.ReturnType = funcSpec.Definition.ReturnType;
+            ValidateReturnTypes(funcSpec.Definition.Body, funcSpec.Definition.ReturnType, funcSpec.Definition.Pos);
         }
         else
         {
-            // Если нет return statements, то тип NoType
-            funcSpec.ReturnType = SemanticType.NoType;
+            CollectReturnTypes(
+                FunctionTable[node.Name.Name].IsTemplateFunction
+                    ? FunctionTable[node.Name.Name].Definition.Body
+                    : funcSpec.Definition.Body,
+                returnTypes);
+
+
+            // Выводим тип возвращаемого значения
+            if (returnTypes.Count > 0)
+            {
+                // Находим общий тип всех return statements
+                var inferredReturnType = returnTypes[0];
+                for (var i = 1; i < returnTypes.Count; i++)
+                    inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
+                funcSpec.ReturnType = inferredReturnType;
+            }
+            else
+            {
+                // Если нет return statements, то тип NoType
+                funcSpec.ReturnType = SemanticType.NoType;
+            }
         }
         if(!funcSpec.BodyChecked)
         {
@@ -457,6 +469,106 @@ public class SemanticCheckVisitor : AutoVisitor
         }
     }
 
+    private void ValidateReturnTypes(StatementNode node, SemanticType expectedReturnType, Position funcPosition)
+{
+    if (node is ReturnNode returnNode)
+    {
+        // Получаем тип выражения в return (или NoType для return без значения)
+        SemanticType actualReturnType;
+        
+        if (returnNode.Expr != null)
+        {
+            actualReturnType = CalcTypeVis(returnNode.Expr, _currentNamespace);
+            
+            // Проверяем совместимость с ожидаемым типом
+            if (!AreTypesCompatible(actualReturnType, expectedReturnType))
+            {
+                string expectedStr = expectedReturnType.ToString();
+                string actualStr = actualReturnType.ToString();
+                
+                CompilerExceptions.SemanticError(
+                    $"Несовместимый тип возвращаемого значения. Ожидалось: {expectedStr}, получено: {actualStr}",
+                    returnNode.Pos ?? funcPosition);
+            }
+        }
+        else
+        {
+            // return без выражения
+            if (expectedReturnType != SemanticType.NoType)
+            {
+                CompilerExceptions.SemanticError(
+                    $"Функция должна возвращать значение типа {expectedReturnType}, " +
+                    "но обнаружен return без значения",
+                    returnNode.Pos ?? funcPosition);
+            }
+        }
+    }
+    else if (node is StatementListNode statementList)
+    {
+        foreach (var stmt in statementList.lst)
+        {
+            ValidateReturnTypes(stmt, expectedReturnType, funcPosition);
+        }
+    }
+    else if (node is BlockNode blcNode)
+    {
+        foreach (var stmt in blcNode.lst.lst)
+        {
+            ValidateReturnTypes(stmt, expectedReturnType, funcPosition);
+        }
+    }
+    else if (node is IfNode ifNode)
+    {
+        ValidateReturnTypes(ifNode.ThenStat, expectedReturnType, funcPosition);
+        if (ifNode.ElseStat != null)
+        {
+            ValidateReturnTypes(ifNode.ElseStat, expectedReturnType, funcPosition);
+        }
+        else
+        {
+            // Если нет else, то может не быть return в одной из веток
+            CheckAllPathsReturn(ifNode.ThenStat, expectedReturnType, ifNode.Pos ?? funcPosition);
+        }
+    }
+    else if (node is WhileNode whileNode)
+    {
+        ValidateReturnTypes(whileNode.Stat, expectedReturnType, funcPosition);
+        // Цикл может не выполниться, поэтому нужен return после цикла
+    }
+    else if (node is ForNode forNode)
+    {
+        ValidateReturnTypes(forNode.Stat, expectedReturnType, funcPosition);
+        // Цикл может не выполниться, поэтому нужен return после цикла
+    }
+}
+    // Проверка, что все пути выполнения возвращают значение
+    private void CheckAllPathsReturn(StatementNode node, SemanticType expectedReturnType, Position pos)
+    {
+        var returnTypes = new List<SemanticType>();
+        CollectReturnTypes(node, returnTypes);
+    
+        if (expectedReturnType != SemanticType.NoType && returnTypes.Count == 0)
+        {
+            CompilerExceptions.SemanticError(
+                "Не все пути выполнения возвращают значение",
+                pos);
+        }
+    }
+    private bool AreTypesCompatible(SemanticType actual, SemanticType expected)
+    {
+        if (expected == SemanticType.AnyType) return true;
+        if (actual == SemanticType.BadType) return false;
+    
+        // Прямое соответствие
+        if (actual == expected) return true;
+    
+        // Неявные преобразования
+        if (expected == SemanticType.DoubleType && actual == SemanticType.IntType)
+            return true;
+    
+        return false;
+    }
+
     private SemanticType GetMoreGeneralType(SemanticType type1, SemanticType type2)
     {
         if (type1 == type2) return type1;
@@ -497,6 +609,7 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         return true;
     }
+    
 
     public override void VisitReturn(ReturnNode node)
     {

@@ -1,9 +1,9 @@
-def f(integer : a)
+def f(integer : a) : integer
   {
-  return 12;
+  return 12.0;
     };
   
-def f(bool : x)
+def f(bool : x) : double
   {
 return 12.5;
     };
