@@ -481,8 +481,44 @@ public class ThreeAddressCodeVisitor : IVisitorP
         }
 
 
-        // Затем вызываем функцию
-        _function_codes[_currentGeneratingFunctionName.Peek()].Add(ThreeAddr.Create(Commands.call, p.Name.Name));
+        var specialization = SymbolTree.FunctionTable[p.Name.Name].Specializations
+            .Find(x => x.SpecializationId == p.SpecializationId);
+
+        if (!SymbolTree.IsStandardFunction(p.Name.Name))
+        {
+            //Обработка тела функции
+            if (!_currentGeneratingFunctionName.Contains(p.Name.Name + p.SpecializationId) &&
+                !_alreadyGeneratedFunctionDefinitions.Contains(p.Name.Name + p.SpecializationId))
+            {
+                _currentTempIndexes[_currentGeneratingFunctionName.Peek()] = _tempCounter;
+
+                _tempCounter = _currentGeneratingFunctionSpecialization.Peek().NameSpace.Variables.Count;
+
+                _currentGeneratingFunctionName.Push(p.Name.Name + p.SpecializationId);
+                if (!_function_codes.ContainsKey(p.Name.Name + p.SpecializationId))
+                    _function_codes[p.Name.Name + p.SpecializationId] = new List<ThreeAddr>();
+
+
+
+                _currentGeneratingFunctionSpecialization.Push(SymbolTree.FunctionTable[p.Name.Name].Specializations
+                    .Find(x => x.SpecializationId == p.SpecializationId));
+
+                int i = 0;
+                foreach (var x in specialization.NameSpace.Variables)
+                {
+                    x.Value.VariableAddress = i++;
+                }
+
+                var lastCheckedNameSpace = _currentNameSpace;
+                _currentNameSpace = specialization.NameSpace;
+                specialization.Definition.VisitP(this);
+                _currentNameSpace = lastCheckedNameSpace;
+
+                _tempCounter = _currentTempIndexes[_currentGeneratingFunctionName.Peek()];
+            }
+        }
+        _function_codes[_currentGeneratingFunctionName.Peek()]
+                .Add(ThreeAddr.Create(Commands.call, !SymbolTree.IsStandardFunction(p.Name.Name)? p.Name.Name + p.SpecializationId: p.Name.Name));
     }
 
     public void VisitFuncCall(FuncCallNode f)

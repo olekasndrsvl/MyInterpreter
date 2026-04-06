@@ -218,7 +218,47 @@ public class FrameSizeVisitor : IVisitorP
         {
             param.VisitP(this);
         }
-        // Параметры передаются через фрейм, временные не создаются
+        var funcFullName = p.Name.Name + p.SpecializationId;
+        if (!_processedFunctions.Contains(funcFullName) && !_currentFunctionName.Contains(funcFullName) && !SymbolTree.IsStandardFunction(p.Name.Name))
+        {
+            _processedFunctions.Add(funcFullName);
+            
+            var previousFunctionName = _currentFunctionName.Peek();
+            var previousSpecialization = _currentFunctionSpecialization.Peek();
+            var previousTempCounter = _currentTempCounter;
+            var previousNamespace = _currentNameSpace;
+            
+            // Переключаемся на новую функцию
+            _currentFunctionName.Push(funcFullName);
+            
+            var specialization = SymbolTree.FunctionTable[p.Name.Name].Specializations
+                .Find(x => x.SpecializationId == p.SpecializationId);
+            
+            _currentFunctionSpecialization.Push(specialization);
+            
+            // Инициализируем счётчик для новой функции количеством локальных переменных
+            var initialTemps = specialization.NameSpace.Variables.Count(x => x.Value.Kind == KindType.VarName);
+            _tempCounters[funcFullName] = initialTemps;
+            _frameSizes[funcFullName] = initialTemps;
+            _currentTempCounter = initialTemps;
+            
+            // Устанавливаем адреса переменных
+            int i = 0;
+            foreach (var variable in specialization.NameSpace.Variables)
+            {
+                variable.Value.VariableAddress = i++;
+            }
+            
+            // Обрабатываем тело функции
+            _currentNameSpace = specialization.NameSpace;
+            specialization.Definition.VisitP(this);
+            
+            // Восстанавливаем контекст
+            _currentNameSpace = previousNamespace;
+            _currentTempCounter = previousTempCounter;
+            _currentFunctionSpecialization.Pop();
+            _currentFunctionName.Pop();
+        }
     }
 
     public void VisitFuncCall(FuncCallNode f)

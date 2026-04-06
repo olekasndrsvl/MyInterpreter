@@ -339,10 +339,12 @@ public static class SymbolTree
         FunctionTable["ToString"] = toStringFunc;
         toStringFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.StringType;
         // Print
-        var printFunc = new FunctionInfo();
+        var printFunc = new FunctionInfo(new FuncDefNode(new IdNode("print"), new List<IdNode>() { new IdNode("x") },
+            new StatementListNode()));
         FunctionTable["print"] = printFunc;
         printFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.NoType;
-
+        printFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.NoType;
+        printFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.NoType;
 
         // Main
         var mainFunc = new FunctionInfo();

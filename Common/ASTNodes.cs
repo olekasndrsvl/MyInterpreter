@@ -733,6 +733,7 @@ public class ForNode : StatementNode
 
 public class ProcCallNode : StatementNode
 {
+    
     public ProcCallNode(IdNode Name, ExprListNode Pars, Position p = null)
     {
         this.Name = Name;
@@ -742,6 +743,7 @@ public class ProcCallNode : StatementNode
 
     public IdNode Name { get; set; }
     public ExprListNode Pars { get; set; }
+    public int SpecializationId { get; set; } = -1; // -1 означает отсутствие специализации
 
     public override string ToString()
     {

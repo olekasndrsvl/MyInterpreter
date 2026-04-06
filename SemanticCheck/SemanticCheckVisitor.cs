@@ -296,6 +296,94 @@ public class SemanticCheckVisitor : AutoVisitor
             CurrentCheckingFunctionSpecialization.Pop();
     }
 
+    public override void VisitProcCall(ProcCallNode p)
+    {
+          if (!FunctionTable.ContainsKey(p.Name.Name))
+          {
+              CompilerExceptions.SemanticError("Процедура с именем " + p.Name.Name + " не определена", p.Name.Pos);
+              return;
+          }
+
+          var funcInfo = FunctionTable[p.Name.Name];
+
+
+      
+          // Вычисляем типы аргументов
+          var argTypes = new List<SemanticType>();
+          foreach (var arg in p.Pars.lst)
+          {
+              arg.VisitP(this);
+              argTypes.Add(CalcTypeVis(arg, _currentNamespace));
+          }
+        
+        
+
+          // Проверяем количество параметров
+          if (funcInfo.Definition.Params.Count() != p.Pars.lst.Count)
+          {
+              CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове процедуры " + p.Name.Name,
+                  p.Name.Pos);
+              return;
+          }
+        
+          // Ищем подходящую специализацию процедуры
+          FunctionSpecialization specialization;
+        
+          if (IsStandardFunction(p.Name.Name))
+          {
+              specialization = FindMatchingStandardSpecialization(p.Name.Name, argTypes.ToArray());
+          }
+          else if (funcInfo.IsTemplateFunction)
+              specialization = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
+          else
+              specialization = funcInfo.FindSpecialization(argTypes.ToArray());
+
+
+          if (specialization == null)
+          {
+              CompilerExceptions.SemanticError($"Невозможно вызвать процедуры {p.Name.Name} c параметрами {string.Join(',',argTypes)}", p.Pos);
+          }
+        
+          // Проверяем совместимость типов аргументов
+          for (var i = 0; i < specialization.ParameterTypes.Length; i++)
+          {
+              var argType = argTypes[i];
+              var paramType = specialization.ParameterTypes[i];
+
+              if (paramType != argType)
+                  CompilerExceptions.SemanticError(
+                      $"Тип аргумента процедуры {argType} не соответствует типу формального параметра {paramType}",
+                      p.Name.Pos);
+          }
+        
+          
+          
+          
+          // Если тело функции еще не проверено для этой специализации, проверяем его
+          try
+          {
+              if (!specialization.BodyChecked && !IsStandardFunction(p.Name.Name))
+              {
+                  specialization.BodyChecked = true;
+                  var oldNamespace = _currentNamespace;
+                  _currentNamespace = specialization.NameSpace;
+                  CheckFunctionBodyWithSpecialization(p.Name.Name, specialization);
+                  _currentNamespace = oldNamespace;
+              }
+          }
+          catch (CompilerExceptions.SemanticException ex)
+          {
+              CompilerExceptions.SemanticError($"Ошибка при вызове процедуры {p.Name}: {ex.Message}", p.Pos);
+          }
+          
+          if (specialization.ReturnType != SemanticType.NoType)
+          {
+              CompilerExceptions.SemanticError("Попытка вызвать функцию " + p.Name.Name + " как процедуру", p.Name.Pos);
+              return;
+          }
+          p.SpecializationId = specialization.SpecializationId;
+    }
+
     public override void VisitFuncCall(FuncCallNode f)
     {
         if (!FunctionTable.ContainsKey(f.Name.Name))
