@@ -130,7 +130,13 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
         {
             if (!Constants.NumTypes.Contains(lt) || !Constants.NumTypes.Contains(rt))
                 CompilerExceptions.SemanticError($"Операция {bin.OpToStr()} не определена для типов {lt} и {rt}", bin.Left.Pos);
-        
+            // Особые случаи для UnknownType
+            if (lt == SemanticType.UnknownType || rt == SemanticType.UnknownType)
+            { 
+                return lt == SemanticType.UnknownType ? rt : lt;
+            }
+            
+            
             // Особые случаи для AnyType
             if (lt == SemanticType.AnyType || rt == SemanticType.AnyType)
             { 

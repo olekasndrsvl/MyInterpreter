@@ -397,17 +397,20 @@ public class SemanticCheckVisitor : AutoVisitor
 
             // Обходим тело функции и собираем типы всех return statements
             CurrentCheckingFunctionSpecialization.Push(specialization);
-
+            specialization.ReturnType = SemanticType.UnknownType;
+            
             var returnTypes = new List<SemanticType>();
             CollectReturnTypes(functionDef.Definition.Body, returnTypes);
-
+            
             // Выводим тип возвращаемого значения
             if (returnTypes.Count > 0)
             {
                 // Находим общий тип всех return statements
                 var inferredReturnType = returnTypes[0];
                 for (var i = 1; i < returnTypes.Count; i++)
+                {
                     inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
+                }
                 specialization.ReturnType = inferredReturnType;
             }
             else
@@ -437,8 +440,8 @@ public class SemanticCheckVisitor : AutoVisitor
             {
                 // Вычисляем тип выражения в return
                 var returnType = CalcTypeVis(returnNode.Expr, _currentNamespace);
-                if (returnTypes.Count == 0)
-                    CurrentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
+                // if (returnTypes.Count == 0)
+                //     CurrentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
                 returnTypes.Add(returnType);
             }
             else
@@ -571,13 +574,18 @@ public class SemanticCheckVisitor : AutoVisitor
 
     private SemanticType GetMoreGeneralType(SemanticType type1, SemanticType type2)
     {
+        if (type1 == SemanticType.UnknownType) return type2;
+        if (type2 == SemanticType.UnknownType) return type1;
+
         if (type1 == type2) return type1;
-        if (type1 == SemanticType.AnyType || type2 == SemanticType.AnyType) return SemanticType.AnyType;
+
         if ((type1 == SemanticType.DoubleType && type2 == SemanticType.IntType) ||
             (type1 == SemanticType.IntType && type2 == SemanticType.DoubleType))
             return SemanticType.DoubleType;
 
-        // Если типы несовместимы, возвращаем BadType
+        if (type1 == SemanticType.AnyType || type2 == SemanticType.AnyType)
+            return SemanticType.AnyType;
+
         return SemanticType.BadType;
     }
     

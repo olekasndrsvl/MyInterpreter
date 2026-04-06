@@ -1,14 +1,9 @@
-def f(a)
-  {
-    
-    };
-  
 def f(x)
   {
-    
+    return f(x)+x;
     };
   
 {
-  
+  print(f(1));
   print(1);
   }

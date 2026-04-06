@@ -9,7 +9,8 @@ public enum SemanticType
     StringType,
     BadType,
     NoType,
-    AnyType
+    AnyType,
+    UnknownType
 }
 
 // Типы символов
@@ -497,5 +498,5 @@ public static class Constants
         TokenType.tkNot
     };
 
-    public static SemanticType[] NumTypes = { SemanticType.IntType, SemanticType.DoubleType, SemanticType.AnyType };
+    public static SemanticType[] NumTypes = { SemanticType.IntType, SemanticType.DoubleType, SemanticType.AnyType, SemanticType.UnknownType };
 }
