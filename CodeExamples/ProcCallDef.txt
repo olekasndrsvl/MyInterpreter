@@ -5,7 +5,8 @@
         return 1;
       return n*factorial(n-1)
     };
-  def pt(x)
+
+  def pt(integer: x) : double
   {
     print(x);
 

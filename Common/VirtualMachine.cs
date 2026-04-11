@@ -49,11 +49,19 @@ public enum Commands
     movin
 }
 
+public enum ValType
+{
+    _int,
+    _double,
+    _bool,
+}
 public struct Value
 {
     public int i;
     public double r;
     public bool b;
+    public ValType ValueType;
+
 }
 
 public class ThreeAddr
@@ -235,17 +243,23 @@ public class VirtualMachine
 
     private static void SetIntValue(int index, bool isIndirect, int value)
     {
-        GetValueRef(index, isIndirect).i = value;
+        ref var cell = ref GetValueRef(index, isIndirect);
+        cell.i = value;
+        cell.ValueType = ValType._int;
     }
 
     private static void SetRealValue(int index, bool isIndirect, double value)
     {
-        GetValueRef(index, isIndirect).r = value;
+        ref var cell = ref GetValueRef(index, isIndirect);
+        cell.r = value;
+        cell.ValueType = ValType._double;
     }
 
     private static void SetBoolValue(int index, bool isIndirect, bool value)
     {
-        GetValueRef(index, isIndirect).b = value;
+        ref var cell = ref GetValueRef(index, isIndirect);
+        cell.b = value;
+        cell.ValueType = ValType._bool;
     }
 
     public static void GiveFrameSize(Dictionary<string, int> dict)
@@ -627,14 +641,19 @@ public class VirtualMachine
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex];
-            if (Math.Abs(value.r) > 0.000001)
-                CompilerForm.Instance.ChangeOutputBoxText(value.r.ToString("F6") + '\n');
-            else
-                CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString() + '\n');
-            
-            Mem[_currentFrameIndex].r = 0;
-            Mem[_currentFrameIndex].i = 0;
-            Mem[_currentFrameIndex].b = false;
+            switch (value.ValueType)
+            {
+                case ValType._double:
+                    CompilerForm.Instance.ChangeOutputBoxText(value.r.ToString("F6") + '\n');
+                    break;
+                case ValType._bool:
+                    CompilerForm.Instance.ChangeOutputBoxText(value.b.ToString() + '\n');
+                    break;
+                case ValType._int:
+                    CompilerForm.Instance.ChangeOutputBoxText(value.i.ToString() + '\n');
+                    break;
+            }
+
             
             _currentFrameStack.Pop();
             _currentFrameIndex = _currentFrameStack.Peek().Item1;
@@ -652,15 +671,18 @@ public class VirtualMachine
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex];
-            if (Math.Abs(value.r) > 0.000001)
-                Mem[_currentFrameIndex].r = double.Sqrt(Mem[_currentFrameIndex].r);
-            else
-                Mem[_currentFrameIndex].r = double.Sqrt(Mem[_currentFrameIndex].i);
-            _returnValueRegister = Mem[_currentFrameIndex];
-            Mem[_currentFrameIndex].r = 0;
-            Mem[_currentFrameIndex].i = 0;
-            Mem[_currentFrameIndex].b = false;
             
+            
+            switch (value.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Sqrt(Mem[_currentFrameIndex].r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r = double.Sqrt(Mem[_currentFrameIndex].i);
+                    break;
+            }
+            _returnValueRegister = Mem[_currentFrameIndex];
             _currentFrameStack.Pop();
             _currentFrameIndex = _currentFrameStack.Peek().Item1;
         }
@@ -675,10 +697,15 @@ public class VirtualMachine
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex];
-            if (Math.Abs(value.r) > 0.000001)
-                Mem[_currentFrameIndex].r = double.Sin(Mem[_currentFrameIndex].r);
-            else
-                Mem[_currentFrameIndex].r = double.Sin(Mem[_currentFrameIndex].i);
+            switch (value.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Sin(Mem[_currentFrameIndex].r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r = double.Sin(Mem[_currentFrameIndex].i);
+                    break;
+            }
             _returnValueRegister = Mem[_currentFrameIndex];
             Mem[_currentFrameIndex].r = 0;
             Mem[_currentFrameIndex].i = 0;
@@ -698,10 +725,15 @@ public class VirtualMachine
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex];
-            if (Math.Abs(value.r) > 0.000001)
-                Mem[_currentFrameIndex].r = double.Cos(Mem[_currentFrameIndex].r);
-            else
-                Mem[_currentFrameIndex].r = double.Cos(Mem[_currentFrameIndex].i);
+            switch (value.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Cos(Mem[_currentFrameIndex].r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r = double.Cos(Mem[_currentFrameIndex].i);
+                    break;
+            }
             _returnValueRegister = Mem[_currentFrameIndex];
             Mem[_currentFrameIndex].r = 0;
             Mem[_currentFrameIndex].i = 0;
@@ -721,10 +753,15 @@ public class VirtualMachine
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex];
-            if (Math.Abs(value.r) > 0.000001)
-                Mem[_currentFrameIndex].r = double.Abs(Mem[_currentFrameIndex].r);
-            else
-                Mem[_currentFrameIndex].i = int.Abs(Mem[_currentFrameIndex].i);
+            switch (value.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Abs(Mem[_currentFrameIndex].r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r = double.Abs(Mem[_currentFrameIndex].i);
+                    break;
+            }
             _returnValueRegister = Mem[_currentFrameIndex];
             Mem[_currentFrameIndex].r = 0;
             Mem[_currentFrameIndex].i = 0;
@@ -745,10 +782,15 @@ public class VirtualMachine
         if (_currentFrameIndex > 0)
         {
             var value = Mem[_currentFrameIndex];
-            if (Math.Abs(value.r) > 0.000001)
-                Mem[_currentFrameIndex].i = (int)Math.Round(Mem[_currentFrameIndex].r);
-            else
-                Mem[_currentFrameIndex].i = (Mem[_currentFrameIndex].i);
+            switch (value.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Round(Mem[_currentFrameIndex].r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r = double.Round(Mem[_currentFrameIndex].i);
+                    break;
+            }
             
             _returnValueRegister = Mem[_currentFrameIndex];
             Mem[_currentFrameIndex].r = 0;
@@ -770,10 +812,16 @@ public class VirtualMachine
         {
             var value1 = Mem[_currentFrameIndex];
             var value2 = Mem[_currentFrameIndex + 1];
-            if ((Math.Abs(value1.r) > 0.000001) && (Math.Abs(value2.r) > 0.000001) )
-                Mem[_currentFrameIndex].r = double.Pow(Mem[_currentFrameIndex].r, value2.r);
-            else
-                Mem[_currentFrameIndex].r =  double.Pow(Mem[_currentFrameIndex].i, value2.i);
+            
+            switch (value1.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Pow(Mem[_currentFrameIndex].r, value2.r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r =  double.Pow(Mem[_currentFrameIndex].i, value2.i);
+                    break;
+            }
             
             _returnValueRegister = Mem[_currentFrameIndex];
             Mem[_currentFrameIndex].r = 0;
@@ -795,10 +843,15 @@ public class VirtualMachine
         {
             var value1 = Mem[_currentFrameIndex];
             var value2 = Mem[_currentFrameIndex + 1];
-            if (Math.Abs(value1.r) > 0.000001)
-                Mem[_currentFrameIndex].r = double.Min(Mem[_currentFrameIndex].r, value2.r);
-            else
-                Mem[_currentFrameIndex].i = int.Min(Mem[_currentFrameIndex].i, value2.i);
+            switch (value1.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Min(Mem[_currentFrameIndex].r, value2.r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r =  double.Min(Mem[_currentFrameIndex].i, value2.i);
+                    break;
+            }
             
             _returnValueRegister = Mem[_currentFrameIndex];
             Mem[_currentFrameIndex].r = 0;
@@ -820,10 +873,15 @@ public class VirtualMachine
         {
             var value1 = Mem[_currentFrameIndex];
             var value2 = Mem[_currentFrameIndex + 1];
-            if (Math.Abs(value1.r) > 0.000001)
-                Mem[_currentFrameIndex].r =  double.Min(Mem[_currentFrameIndex].r, value2.r);
-            else
-                Mem[_currentFrameIndex].i = int.Max(Mem[_currentFrameIndex].i, value2.i);
+            switch (value1.ValueType)
+            {
+                case ValType._double:
+                    Mem[_currentFrameIndex].r = double.Max(Mem[_currentFrameIndex].r, value2.r);
+                    break;
+                case ValType._int:
+                    Mem[_currentFrameIndex].r =  double.Max(Mem[_currentFrameIndex].i, value2.i);
+                    break;
+            }
 
             
             _returnValueRegister = Mem[_currentFrameIndex];

@@ -72,12 +72,11 @@ public abstract class ParserBase<TokenType>
 // Program := DefinitionsAndStatements
 // DefinitionsAndStatements := (DefinitionsList MainProgram | MainProgram | E)
 // DefinitionsList := Definition (';', Definition)*
-
 // MainProgram := BlockStatement
 // FunDefList := FuncDef+
 // StatementList := Statement (';' Statement)*
 // Statement := Assign | ProcCall | IfStatement | WhileStatement | ForStatement | BlockStatement | ReturnStatement
-// FuncDef := def Id '(' IdList ')' Statement | def Id '(' TypedIdList ')' Statement | | def Id '(' TypedIdList ')' : TypeNode Statement
+// FuncDef := def Id '(' IdList ')' Statement | def Id '(' TypedIdList ')' Statement | def Id '(' TypedIdList ')' : TypeNode Statement
 // Assign := Id ('=' | '+=' | '-=' | '*=' | '/=') Expr 
 // VarAssign := var Id = Expr
 // ProcCall := Id '(' ExprList ')

@@ -36,10 +36,12 @@ partial class CompilerForm
                 // Replaced RichTextBox with ScintillaNET editor for MVP
                 codeTextBox = new ScintillaNET.Scintilla();
                 outputTextBox = new System.Windows.Forms.RichTextBox();
+                #if DEBUG
                 button1 = new System.Windows.Forms.Button();
                 button2 = new System.Windows.Forms.Button();
                 button3 = new System.Windows.Forms.Button();
                 button4 = new System.Windows.Forms.Button();
+                #endif
                 menuStrip.SuspendLayout();
                 ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
                 splitContainer.Panel1.SuspendLayout();
@@ -223,10 +225,12 @@ partial class CompilerForm
                 AutoScaleDimensions = new System.Drawing.SizeF(8F, 19F);
                 AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
                 ClientSize = new System.Drawing.Size(1067, 658);
+                #if DEBUG
                 Controls.Add(button4);
                 Controls.Add(button3);
                 Controls.Add(button2);
                 Controls.Add(button1);
+                #endif
                 Controls.Add(splitContainer);
                 Controls.Add(refactorButton);
                 Controls.Add(runButton);
@@ -245,10 +249,12 @@ partial class CompilerForm
                 PerformLayout();
             }
 
+            #if DEBUG
             private System.Windows.Forms.Button button1;
             private System.Windows.Forms.Button button2;
             private System.Windows.Forms.Button button3;
             private System.Windows.Forms.Button button4;
+            #endif
 
             //#endregion
     

@@ -449,6 +449,8 @@ public class SemanticCheckVisitor : AutoVisitor
             CompilerExceptions.SemanticError("Попытка вызвать процедуру " + f.Name.Name + " как функцию", f.Name.Pos);
             return;
         }
+        if(specialization.ReturnType == SemanticType.UnknownType)
+            CompilerExceptions.SemanticError($"Невозможно автоматически вывести тип возвращаемого значения функции {f.Name.Name}",f.Name.Pos);
         // Если тело функции еще не проверено для этой специализации, проверяем его
         try
         {

@@ -656,6 +656,7 @@ public partial class CompilerForm : Form
             progr.VisitP(gen);
 
 #if DEBUG
+            SymbolTree.PrintFunctionTable();
             frame_gen.PrintFrameSizes();
 #endif
 
@@ -667,8 +668,10 @@ public partial class CompilerForm : Form
 #endif
 
             VirtualMachine.LoadProgram(code);
+            #if DEBUG
             VirtualMachine.MemoryDump(1000);
-
+            #endif
+            
             var sw = new Stopwatch();
             sw.Start();
             VirtualMachine.Run();
@@ -678,7 +681,9 @@ public partial class CompilerForm : Form
             {
                 Instance.ChangeOutputBoxText($"⏱️ Время выполнения: {sw.Elapsed}\n");
             }
+            #if DEBIG
             VirtualMachine.MemoryDump(1000);
+            #endif
             VirtualMachine.ResetVirtualMachine();
         }
         catch (CompilerExceptions.BaseCompilerException ex)
