@@ -34,12 +34,23 @@ public class SemanticCheckVisitor : AutoVisitor
 
     public override void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)
     {
+        RegisterFunctionDeclarations(DefandStmts.DefinitionsList);
         DefandStmts.DefinitionsList.VisitP(this);
         
         _currentNamespace = CurrentCheckingFunctionSpecialization.Peek().NameSpace;
         
         DefandStmts.MainProgram.VisitP(this);
     }
+
+    private void RegisterFunctionDeclarations(DefinitionsListNode definitions)
+    {
+        foreach (var definition in definitions.lst)
+        {
+            if (definition is FuncDefNode funcDef)
+                SymbolTree.RegisterFunctionDeclaration(funcDef, _currentNamespace);
+        }
+    }
+
     public override void VisitVarAssign(VarAssignNode vass)
     {
         vass.Expr.VisitP(this);
@@ -213,43 +224,7 @@ public class SemanticCheckVisitor : AutoVisitor
 
     public override void VisitFuncDef(FuncDefNode node)
     {
-        
-        // Проверяем, не объявлена ли уже функция с таким именем
-        if (FunctionTable.ContainsKey(node.Name.Name) && !node.IsClearTypes)
-        {
-            CompilerExceptions.SemanticError($"Функция '{node.Name.Name}' уже объявлена", node.Name.Pos);
-            return;
-        }
-
-        if (_currentNamespace != SymbolTree.Global)
-        {
-            throw new CompilerExceptions.UnExpectedException("Определение функции оказалось не в глобальном пространстве имен!");
-        }
-        
-        // Сохраняем определение функции
-        if(!FunctionTable.ContainsKey(node.Name.Name))
-        {
-            FunctionTable[node.Name.Name] = new FunctionInfo(isTemplate: !node.IsClearTypes);
-            FunctionTable[node.Name.Name].Definition = node;
-        }
-
-        SemanticType[] paramTypes;
-        FunctionSpecialization funcSpec;
-        if (!node.IsClearTypes)
-        {
-            // Добавляем функцию с типами AnyType - конкретные типы будут выведены при вызовах
-            paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
-            funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
-
-        }
-        else
-        {
-            paramTypes = node.Params.Select(x => x.ValueType).ToArray();
-            if(FunctionTable[node.Name.Name].FindSpecialization(paramTypes) != null)
-                CompilerExceptions.SemanticError($"Функция с именем {node.Name.Name} и типами параметров: {string.Join(',',paramTypes)} уже объявлена!", node.Name.Pos);
-            funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
-            funcSpec.Definition = node;
-        }
+        var funcSpec = SymbolTree.RegisterFunctionDeclaration(node, _currentNamespace);
 
         // Тут проверим тело функции
         CurrentCheckingFunctionSpecialization.Push(funcSpec);
@@ -263,6 +238,7 @@ public class SemanticCheckVisitor : AutoVisitor
         }
         else
         {
+            funcSpec.ReturnType = SemanticType.UnknownType;
             CollectReturnTypes(
                 FunctionTable[node.Name.Name].IsTemplateFunction
                     ? FunctionTable[node.Name.Name].Definition.Body

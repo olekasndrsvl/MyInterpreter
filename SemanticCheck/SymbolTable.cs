@@ -264,11 +264,13 @@ public static class SymbolTree
     }
     public static GlobalNameSpace Global { get; private set; }
     public static Dictionary<string, FunctionInfo> FunctionTable { get; private set; }
+    private static HashSet<FuncDefNode> RegisteredFunctionDefinitions { get; set; } = new();
 
     public static void Reset()
     {
         Global = new GlobalNameSpace();
         FunctionTable = new Dictionary<string, FunctionInfo>();
+        RegisteredFunctionDefinitions = new HashSet<FuncDefNode>();
         InitStandardFunctions();
     }
 
@@ -400,6 +402,64 @@ public static class SymbolTree
             specializationId < funcInfo.Specializations.Count)
             return funcInfo.Specializations[specializationId];
         return null;
+    }
+
+    public static FunctionSpecialization RegisterFunctionDeclaration(FuncDefNode node, NameSpace currentNamespace)
+    {
+        if (RegisteredFunctionDefinitions.Contains(node))
+            return GetDeclaredSpecialization(node);
+
+        if (currentNamespace != Global)
+        {
+            throw new CompilerExceptions.UnExpectedException("Определение функции оказалось не в глобальном пространстве имен!");
+        }
+
+        if (!node.IsClearTypes)
+        {
+            if (FunctionTable.ContainsKey(node.Name.Name))
+            {
+                CompilerExceptions.SemanticError($"Функция '{node.Name.Name}' уже объявлена", node.Name.Pos);
+                throw new CompilerExceptions.UnExpectedException("SemanticError must interrupt execution");
+            }
+
+            FunctionTable[node.Name.Name] = new FunctionInfo(node, isTemplate: true);
+            var paramTypes = node.Params.Select(p => SemanticType.AnyType).ToArray();
+            var funcSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(paramTypes);
+            funcSpec.Definition = node;
+            if (node.IsReturnTypeDeclared)
+                funcSpec.ReturnType = node.ReturnType;
+
+            RegisteredFunctionDefinitions.Add(node);
+            return funcSpec;
+        }
+
+        if (!FunctionTable.ContainsKey(node.Name.Name))
+            FunctionTable[node.Name.Name] = new FunctionInfo(node, isTemplate: false);
+
+        var typedParamTypes = node.Params.Select(x => x.ValueType).ToArray();
+        if (FunctionTable[node.Name.Name].FindSpecialization(typedParamTypes) != null)
+            CompilerExceptions.SemanticError($"Функция с именем {node.Name.Name} и типами параметров: {string.Join(',', typedParamTypes)} уже объявлена!", node.Name.Pos);
+
+        var typedSpec = FunctionTable[node.Name.Name].FindOrCreateSpecialization(typedParamTypes);
+        typedSpec.Definition = node;
+        if (node.IsReturnTypeDeclared)
+            typedSpec.ReturnType = node.ReturnType;
+
+        RegisteredFunctionDefinitions.Add(node);
+        return typedSpec;
+    }
+
+    public static FunctionSpecialization GetDeclaredSpecialization(FuncDefNode node)
+    {
+        var paramTypes = node.IsClearTypes
+            ? node.Params.Select(x => x.ValueType).ToArray()
+            : node.Params.Select(p => SemanticType.AnyType).ToArray();
+
+        var specialization = FunctionTable[node.Name.Name].FindSpecialization(paramTypes);
+        if (specialization == null)
+            throw new CompilerExceptions.UnExpectedException($"Не найдена зарегистрированная специализация функции {node.Name.Name}");
+
+        return specialization;
     }
 
     // Поиск функции
