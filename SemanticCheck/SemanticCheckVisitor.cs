@@ -229,44 +229,9 @@ public class SemanticCheckVisitor : AutoVisitor
         // Тут проверим тело функции
         CurrentCheckingFunctionSpecialization.Push(funcSpec);
         _currentNamespace = funcSpec.NameSpace;
-        var returnTypes = new List<SemanticType>();
-
-        if (funcSpec.Definition != null && funcSpec.Definition.IsReturnTypeDeclared)
-        {
-            funcSpec.ReturnType = funcSpec.Definition.ReturnType;
-            ValidateReturnTypes(funcSpec.Definition.Body, funcSpec.Definition.ReturnType, funcSpec.Definition.Pos);
-        }
-        else
-        {
-            funcSpec.ReturnType = SemanticType.UnknownType;
-            CollectReturnTypes(
-                FunctionTable[node.Name.Name].IsTemplateFunction
-                    ? FunctionTable[node.Name.Name].Definition.Body
-                    : funcSpec.Definition.Body,
-                returnTypes);
-
-
-            // Выводим тип возвращаемого значения
-            if (returnTypes.Count > 0)
-            {
-                // Находим общий тип всех return statements
-                var inferredReturnType = returnTypes[0];
-                for (var i = 1; i < returnTypes.Count; i++)
-                    inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
-                funcSpec.ReturnType = inferredReturnType;
-            }
-            else
-            {
-                // Если нет return statements, то тип NoType
-                funcSpec.ReturnType = SemanticType.NoType;
-            }
-        }
-        if(!funcSpec.BodyChecked)
-        {
-            funcSpec.BodyChecked = true;
-            node.Body.VisitP(this);
-            _currentNamespace = _currentNamespace.Parent;
-        }
+        InferReturnType(node.Name.Name, funcSpec);
+        CheckFunctionBody(funcSpec, node.Body);
+        _currentNamespace = _currentNamespace.Parent;
         
         if (CurrentCheckingFunctionSpecialization.Count > 1)
             CurrentCheckingFunctionSpecialization.Pop();
@@ -274,16 +239,6 @@ public class SemanticCheckVisitor : AutoVisitor
 
     public override void VisitProcCall(ProcCallNode p)
     {
-          if (!FunctionTable.ContainsKey(p.Name.Name))
-          {
-              CompilerExceptions.SemanticError("Процедура с именем " + p.Name.Name + " не определена", p.Name.Pos);
-              return;
-          }
-
-          var funcInfo = FunctionTable[p.Name.Name];
-
-
-      
           // Вычисляем типы аргументов
           var argTypes = new List<SemanticType>();
           foreach (var arg in p.Pars.lst)
@@ -291,34 +246,7 @@ public class SemanticCheckVisitor : AutoVisitor
               arg.VisitP(this);
               argTypes.Add(CalcTypeVis(arg, _currentNamespace));
           }
-        
-        
-
-          // Проверяем количество параметров
-          if (funcInfo.Definition.Params.Count() != p.Pars.lst.Count)
-          {
-              CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове процедуры " + p.Name.Name,
-                  p.Name.Pos);
-              return;
-          }
-        
-          // Ищем подходящую специализацию процедуры
-          FunctionSpecialization specialization;
-        
-          if (IsStandardFunction(p.Name.Name))
-          {
-              specialization = FindMatchingStandardSpecialization(p.Name.Name, argTypes.ToArray());
-          }
-          else if (funcInfo.IsTemplateFunction)
-              specialization = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
-          else
-              specialization = funcInfo.FindSpecialization(argTypes.ToArray());
-
-
-          if (specialization == null)
-          {
-              CompilerExceptions.SemanticError($"Невозможно вызвать процедуры {p.Name.Name} c параметрами {string.Join(',',argTypes)}", p.Pos);
-          }
+          var specialization = SymbolTree.ResolveCallSpecialization(p.Name.Name, argTypes.ToArray(), p.Pos);
         
           // Проверяем совместимость типов аргументов
           for (var i = 0; i < specialization.ParameterTypes.Length; i++)
@@ -340,7 +268,6 @@ public class SemanticCheckVisitor : AutoVisitor
           {
               if (!specialization.BodyChecked && !IsStandardFunction(p.Name.Name))
               {
-                  specialization.BodyChecked = true;
                   var oldNamespace = _currentNamespace;
                   _currentNamespace = specialization.NameSpace;
                   CheckFunctionBodyWithSpecialization(p.Name.Name, specialization);
@@ -362,16 +289,6 @@ public class SemanticCheckVisitor : AutoVisitor
 
     public override void VisitFuncCall(FuncCallNode f)
     {
-        if (!FunctionTable.ContainsKey(f.Name.Name))
-        {
-            CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
-            return;
-        }
-
-        var funcInfo = FunctionTable[f.Name.Name];
-
-
-      
         // Вычисляем типы аргументов
         var argTypes = new List<SemanticType>();
         foreach (var arg in f.Pars.lst)
@@ -379,34 +296,7 @@ public class SemanticCheckVisitor : AutoVisitor
             arg.VisitP(this);
             argTypes.Add(CalcTypeVis(arg, _currentNamespace));
         }
-        
-        
-
-        // Проверяем количество параметров
-        if (funcInfo.Definition.Params.Count() != f.Pars.lst.Count)
-        {
-            CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове функции " + f.Name.Name,
-                f.Name.Pos);
-            return;
-        }
-        
-        // Ищем подходящую специализацию функции
-        FunctionSpecialization specialization;
-        
-        if (IsStandardFunction(f.Name.Name))
-        {
-            specialization = FindMatchingStandardSpecialization(f.Name.Name, argTypes.ToArray());
-        }
-        else if (funcInfo.IsTemplateFunction)
-            specialization = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
-        else
-            specialization = funcInfo.FindSpecialization(argTypes.ToArray());
-
-
-        if (specialization == null)
-        {
-            CompilerExceptions.SemanticError($"Невозможно вызвать функцию {f.Name.Name} c параметрами {string.Join(',',argTypes)}", f.Pos);
-        }
+        var specialization = SymbolTree.ResolveCallSpecialization(f.Name.Name, argTypes.ToArray(), f.Pos);
         
         // Проверяем совместимость типов аргументов
         for (var i = 0; i < specialization.ParameterTypes.Length; i++)
@@ -432,7 +322,6 @@ public class SemanticCheckVisitor : AutoVisitor
         {
             if (!specialization.BodyChecked && !IsStandardFunction(f.Name.Name))
             {
-                specialization.BodyChecked = true;
                 var oldNamespace = _currentNamespace;
                 _currentNamespace = specialization.NameSpace;
                 CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
@@ -448,6 +337,65 @@ public class SemanticCheckVisitor : AutoVisitor
         f.ValueType = specialization.ReturnType;
         f.SpecializationId = specialization.SpecializationId;
     }
+
+    private void InferReturnType(string functionName, FunctionSpecialization specialization)
+    {
+        if (!FunctionTable.TryGetValue(functionName, out var functionDef))
+        {
+            CompilerExceptions.SemanticError($"Не найдено определение функции '{functionName}'", new Position(0, 0));
+            return;
+        }
+
+        var definition = specialization.Definition ?? functionDef.Definition;
+        if (definition == null)
+            throw new CompilerExceptions.UnExpectedException($"Не найдено определение функции '{functionName}'");
+
+        if (definition.IsReturnTypeDeclared)
+        {
+            specialization.ReturnType = definition.ReturnType;
+            specialization.State = FunctionSpecializationState.Inferred;
+            ValidateReturnTypes(definition.Body, definition.ReturnType, definition.Pos);
+            return;
+        }
+
+        specialization.State = FunctionSpecializationState.Inferring;
+        specialization.ReturnType = SemanticType.UnknownType;
+
+        var returnTypes = new List<SemanticType>();
+        CollectReturnTypes(
+            functionDef.IsTemplateFunction
+                ? functionDef.Definition.Body
+                : definition.Body,
+            returnTypes);
+
+        // Выводим тип возвращаемого значения
+        if (returnTypes.Count > 0)
+        {
+            // Находим общий тип всех return statements
+            var inferredReturnType = returnTypes[0];
+            for (var i = 1; i < returnTypes.Count; i++)
+                inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
+            specialization.ReturnType = inferredReturnType;
+        }
+        else
+        {
+            // Если нет return statements, то тип NoType
+            specialization.ReturnType = SemanticType.NoType;
+        }
+
+        specialization.State = FunctionSpecializationState.Inferred;
+    }
+
+    private void CheckFunctionBody(FunctionSpecialization specialization, StatementNode body)
+    {
+        if (specialization.BodyChecked)
+            return;
+
+        specialization.State = FunctionSpecializationState.Checking;
+        specialization.BodyChecked = true;
+        body.VisitP(this);
+        specialization.State = FunctionSpecializationState.Checked;
+    }
     
     private void CheckFunctionBodyWithSpecialization(string functionName, FunctionSpecialization specialization)
     {
@@ -459,35 +407,14 @@ public class SemanticCheckVisitor : AutoVisitor
         
         try
         {
-           
-
-            // Обходим тело функции и собираем типы всех return statements
             CurrentCheckingFunctionSpecialization.Push(specialization);
-            specialization.ReturnType = SemanticType.UnknownType;
-            
-            var returnTypes = new List<SemanticType>();
-            CollectReturnTypes(functionDef.Definition.Body, returnTypes);
-            
-            // Выводим тип возвращаемого значения
-            if (returnTypes.Count > 0)
-            {
-                // Находим общий тип всех return statements
-                var inferredReturnType = returnTypes[0];
-                for (var i = 1; i < returnTypes.Count; i++)
-                {
-                    inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
-                }
-                specialization.ReturnType = inferredReturnType;
-            }
-            else
-            {
-                // Если нет return statements, то тип NoType
-                specialization.ReturnType = SemanticType.NoType;
-            }
+            InferReturnType(functionName, specialization);
     
-            FuncDefNode clonedDef = functionDef.Definition.Clone() as FuncDefNode;
+            if (functionDef.Definition.Clone() is not FuncDefNode clonedDef)
+                throw new CompilerExceptions.UnExpectedException($"Не удалось клонировать определение функции '{functionName}'");
+
             specialization.Definition = clonedDef;
-            clonedDef.Body.VisitP(this);
+            CheckFunctionBody(specialization, clonedDef.Body);
         }
         finally
         {
@@ -655,36 +582,6 @@ public class SemanticCheckVisitor : AutoVisitor
         return SemanticType.BadType;
     }
     
-    private FunctionSpecialization FindMatchingStandardSpecialization(string functionName, SemanticType[] argTypes)
-    {
-        if (!FunctionTable.ContainsKey(functionName))
-            return null;
-
-        var funcInfo = FunctionTable[functionName];
-        foreach (var spec in funcInfo.Specializations)
-        {
-            if (AreParameterTypesCompatible(spec.ParameterTypes, argTypes))
-            {
-                return spec;
-            }
-        }
-        return funcInfo.Specializations.First();
-    }
-
-    private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
-    {
-        if (paramTypes.Length != argTypes.Length)
-            return false;
-
-        for (int i = 0; i < paramTypes.Length; i++)
-        {
-            if (paramTypes[i] != argTypes[i])
-                return false;
-        }
-        return true;
-    }
-    
-
     public override void VisitReturn(ReturnNode node)
     {
         if (node.Expr != null)

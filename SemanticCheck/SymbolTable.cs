@@ -20,6 +20,16 @@ public enum KindType
     FuncName
 }
 
+public enum FunctionSpecializationState
+{
+    Declared,
+    Inferring,
+    Inferred,
+    Checking,
+    Checked,
+    Failed
+}
+
 // Информация о символе
 public class SymbolInfo(string n, KindType k, SemanticType[] pars, SemanticType t)
 {
@@ -142,6 +152,7 @@ public class FunctionSpecialization
     public NameSpace NameSpace { get; set; }
     public int SpecializationId { get; set; }
     public bool BodyChecked { get; set; }
+    public FunctionSpecializationState State { get; set; } = FunctionSpecializationState.Declared;
 
     public override bool Equals(object obj)
     {
@@ -460,6 +471,68 @@ public static class SymbolTree
             throw new CompilerExceptions.UnExpectedException($"Не найдена зарегистрированная специализация функции {node.Name.Name}");
 
         return specialization;
+    }
+
+    public static FunctionSpecialization ResolveCallSpecialization(string functionName, SemanticType[] argTypes,
+        Position position, bool createTemplateSpecialization = true)
+    {
+        if (!FunctionTable.TryGetValue(functionName, out var funcInfo))
+        {
+            CompilerExceptions.SemanticError("Функция с именем " + functionName + " не определена", position);
+            throw new CompilerExceptions.UnExpectedException("SemanticError must interrupt execution");
+        }
+
+        if (funcInfo.Definition?.Params.Count != null && funcInfo.Definition.Params.Count != argTypes.Length)
+        {
+            CompilerExceptions.SemanticError(
+                $"Несоответствие количества параметров при вызове функции {functionName}", position);
+            throw new CompilerExceptions.UnExpectedException("SemanticError must interrupt execution");
+        }
+
+        FunctionSpecialization specialization;
+        if (IsStandardFunction(functionName))
+            specialization = FindMatchingStandardSpecialization(functionName, argTypes);
+        else if (funcInfo.IsTemplateFunction)
+            specialization = createTemplateSpecialization
+                ? funcInfo.FindOrCreateSpecialization(argTypes)
+                : funcInfo.FindSpecialization(argTypes);
+        else
+            specialization = funcInfo.FindSpecialization(argTypes);
+
+        if (specialization == null)
+        {
+            CompilerExceptions.SemanticError(
+                $"Невозможно вызвать функцию {functionName} c параметрами {string.Join(',', argTypes)}", position);
+            throw new CompilerExceptions.UnExpectedException("SemanticError must interrupt execution");
+        }
+
+        return specialization;
+    }
+
+    public static FunctionSpecialization FindMatchingStandardSpecialization(string functionName, SemanticType[] argTypes)
+    {
+        if (!FunctionTable.ContainsKey(functionName))
+            throw new CompilerExceptions.UnExpectedException($"Не найдена стандартная функция {functionName}");
+
+        var funcInfo = FunctionTable[functionName];
+        foreach (var spec in funcInfo.Specializations)
+        {
+            if (AreParameterTypesCompatible(spec.ParameterTypes, argTypes))
+                return spec;
+        }
+
+        return funcInfo.Specializations.First();
+    }
+
+    public static bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
+    {
+        if (paramTypes.Length != argTypes.Length)
+            return false;
+
+        for (var i = 0; i < paramTypes.Length; i++)
+            if (paramTypes[i] != argTypes[i])
+                return false;
+        return true;
     }
 
     // Поиск функции

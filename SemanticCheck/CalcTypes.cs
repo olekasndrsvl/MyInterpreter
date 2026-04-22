@@ -207,33 +207,16 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     
     public SemanticType VisitProcCall(ProcCallNode f)
     {
-        if (!FunctionTable.ContainsKey(f.Name.Name))
-             CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
-        
-        var funcInfo = FunctionTable[f.Name.Name];
-        
         // Вычисляем типы аргументов
         var argTypes = new List<SemanticType>();
         foreach (var arg in f.Pars.lst)
         {
             argTypes.Add(CalcTypeVis(arg));
         }
-        // Для стандартных функций используем специализацию по умолчанию
-        FunctionSpecialization spec;
-        if (funcInfo.Specializations.Count > 0)
-        {
-            spec = funcInfo.Specializations[0];
-        }
-        else
-        {
-            spec = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
-        }
+        var spec = ResolveCallSpecialization(f.Name.Name, argTypes.ToArray(), f.Name.Pos);
 
         if (spec.ReturnType != SemanticType.NoType)
              CompilerExceptions.SemanticError("Попытка вызвать функцию " + f.Name.Name + " как процедуру", f.Name.Pos);
-        
-        if (funcInfo.Definition?.Params.Count != f.Pars.lst.Count)
-             CompilerExceptions.SemanticError("Несоответствие количества параметров при вызове процедуры " + f.Name.Name, f.Name.Pos);
         
         for (int i = 0; i < f.Pars.lst.Count; i++)
         {
@@ -247,34 +230,13 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
     
     public SemanticType VisitFuncCall(FuncCallNode f)
     {
-        if (!FunctionTable.ContainsKey(f.Name.Name))
-            CompilerExceptions.SemanticError("Функция с именем " + f.Name.Name + " не определена", f.Name.Pos);
-        
-        var funcInfo = FunctionTable[f.Name.Name];
-        
         // Вычисляем типы аргументов
         var argTypes = new List<SemanticType>();
         foreach (var arg in f.Pars.lst)
         {
             argTypes.Add(CalcTypeVis(arg));
         }
-
-        // Для стандартных функций используем предопределенные специализации
-        FunctionSpecialization specialization;
-        if (IsStandardFunction(f.Name.Name))
-        {
-            specialization = FindMatchingStandardSpecialization(f.Name.Name, argTypes.ToArray());
-            if (specialization == null)
-            {
-                CompilerExceptions.SemanticError($"Нет подходящей специализации для функции {f.Name.Name} с аргументами {string.Join(", ", argTypes)}", f.Name.Pos);
-                return SemanticType.BadType;
-            }
-        }
-        else
-        {
-            // Для пользовательских функций создаем/находим специализацию
-            specialization = funcInfo.FindOrCreateSpecialization(argTypes.ToArray());
-        }
+        var specialization = ResolveCallSpecialization(f.Name.Name, argTypes.ToArray(), f.Name.Pos);
 
         // Проверяем совместимость типов аргументов
         for (int i = 0; i < specialization.ParameterTypes.Length; i++)
@@ -287,36 +249,6 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
         }
         
         return specialization.ReturnType;
-    }
-
-
-    private FunctionSpecialization FindMatchingStandardSpecialization(string functionName, SemanticType[] argTypes)
-    {
-        if (!FunctionTable.ContainsKey(functionName))
-            return null;
-
-        var funcInfo = FunctionTable[functionName];
-        foreach (var spec in funcInfo.Specializations)
-        {
-            if (AreParameterTypesCompatible(spec.ParameterTypes, argTypes))
-            {
-                return spec;
-            }
-        }
-        return funcInfo.Specializations.First();
-    }
-
-    private bool AreParameterTypesCompatible(SemanticType[] paramTypes, SemanticType[] argTypes)
-    {
-        if (paramTypes.Length != argTypes.Length)
-            return false;
-
-        for (int i = 0; i < paramTypes.Length; i++)
-        {
-            if (paramTypes[i] != argTypes[i])
-                return false;
-        }
-        return true;
     }
 
     public SemanticType VisitFuncDef(FuncDefNode f) => SemanticType.NoType;
