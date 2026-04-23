@@ -219,46 +219,7 @@ public class FrameSizeVisitor : IVisitorP
             param.VisitP(this);
         }
         var funcFullName = p.Name.Name + p.SpecializationId;
-        if (!_processedFunctions.Contains(funcFullName) && !_currentFunctionName.Contains(funcFullName) && !SymbolTree.IsStandardFunction(p.Name.Name))
-        {
-            _processedFunctions.Add(funcFullName);
-            
-            var previousFunctionName = _currentFunctionName.Peek();
-            var previousSpecialization = _currentFunctionSpecialization.Peek();
-            var previousTempCounter = _currentTempCounter;
-            var previousNamespace = _currentNameSpace;
-            
-            // Переключаемся на новую функцию
-            _currentFunctionName.Push(funcFullName);
-            
-            var specialization = SymbolTree.FunctionTable[p.Name.Name].Specializations
-                .Find(x => x.SpecializationId == p.SpecializationId);
-            
-            _currentFunctionSpecialization.Push(specialization);
-            
-            // Инициализируем счётчик для новой функции количеством локальных переменных
-            var initialTemps = specialization.NameSpace.Variables.Count(x => x.Value.Kind == KindType.VarName);
-            _tempCounters[funcFullName] = initialTemps;
-            _frameSizes[funcFullName] = initialTemps;
-            _currentTempCounter = initialTemps;
-            
-            // Устанавливаем адреса переменных
-            int i = 0;
-            foreach (var variable in specialization.NameSpace.Variables)
-            {
-                variable.Value.VariableAddress = i++;
-            }
-            
-            // Обрабатываем тело функции
-            _currentNameSpace = specialization.NameSpace;
-            specialization.Definition.VisitP(this);
-            
-            // Восстанавливаем контекст
-            _currentNameSpace = previousNamespace;
-            _currentTempCounter = previousTempCounter;
-            _currentFunctionSpecialization.Pop();
-            _currentFunctionName.Pop();
-        }
+        ProcessFunctionSpecializationIfNeeded(p.Name.Name, p.SpecializationId, funcFullName);
     }
 
     public void VisitFuncCall(FuncCallNode f)
@@ -273,46 +234,7 @@ public class FrameSizeVisitor : IVisitorP
         
         // Если функция ещё не обработана - обрабатываем её тело
         
-        if (!_processedFunctions.Contains(funcFullName) && !_currentFunctionName.Contains(funcFullName) && !SymbolTree.IsStandardFunction(f.Name.Name))
-        {
-            _processedFunctions.Add(funcFullName);
-            
-            var previousFunctionName = _currentFunctionName.Peek();
-            var previousSpecialization = _currentFunctionSpecialization.Peek();
-            var previousTempCounter = _currentTempCounter;
-            var previousNamespace = _currentNameSpace;
-            
-            // Переключаемся на новую функцию
-            _currentFunctionName.Push(funcFullName);
-            
-            var specialization = SymbolTree.FunctionTable[f.Name.Name].Specializations
-                .Find(x => x.SpecializationId == f.SpecializationId);
-            
-            _currentFunctionSpecialization.Push(specialization);
-            
-            // Инициализируем счётчик для новой функции количеством локальных переменных
-            var initialTemps = specialization.NameSpace.Variables.Count(x => x.Value.Kind == KindType.VarName);
-            _tempCounters[funcFullName] = initialTemps;
-            _frameSizes[funcFullName] = initialTemps;
-            _currentTempCounter = initialTemps;
-            
-            // Устанавливаем адреса переменных
-            int i = 0;
-            foreach (var variable in specialization.NameSpace.Variables)
-            {
-                variable.Value.VariableAddress = i++;
-            }
-            
-            // Обрабатываем тело функции
-            _currentNameSpace = specialization.NameSpace;
-            specialization.Definition.VisitP(this);
-            
-            // Восстанавливаем контекст
-            _currentNameSpace = previousNamespace;
-            _currentTempCounter = previousTempCounter;
-            _currentFunctionSpecialization.Pop();
-            _currentFunctionName.Pop();
-        }
+        ProcessFunctionSpecializationIfNeeded(f.Name.Name, f.SpecializationId, funcFullName);
 
         // Результат функции
         NewTemp();
@@ -321,6 +243,56 @@ public class FrameSizeVisitor : IVisitorP
     public void VisitFuncDef(FuncDefNode f)
     {
         f.Body.VisitP(this);
+    }
+
+    private void ProcessFunctionSpecializationIfNeeded(string functionName, int specializationId, string funcFullName)
+    {
+        if (SymbolTree.IsStandardFunction(functionName) ||
+            _processedFunctions.Contains(funcFullName) ||
+            _currentFunctionName.Contains(funcFullName))
+            return;
+
+        var specialization = SymbolTree.FunctionTable[functionName].Specializations
+            .Find(x => x.SpecializationId == specializationId);
+
+        if (specialization == null)
+            throw new CompilerExceptions.UnExpectedException(
+                $"Specialization {specializationId} for function '{functionName}' was not found during frame calculation.");
+
+        _processedFunctions.Add(funcFullName);
+
+        var previousTempCounter = _currentTempCounter;
+        var previousNamespace = _currentNameSpace;
+
+        _currentFunctionName.Push(funcFullName);
+        _currentFunctionSpecialization.Push(specialization);
+
+        var initialTemps = specialization.NameSpace.Variables.Count(x => x.Value.Kind == KindType.VarName);
+        _tempCounters[funcFullName] = initialTemps;
+        _frameSizes[funcFullName] = initialTemps;
+        _currentTempCounter = initialTemps;
+
+        var variableAddress = 0;
+        foreach (var variable in specialization.NameSpace.Variables)
+            variable.Value.VariableAddress = variableAddress++;
+
+        try
+        {
+            _currentNameSpace = specialization.NameSpace;
+            specialization.Definition.Body.VisitP(this);
+        }
+        finally
+        {
+            _currentNameSpace = previousNamespace;
+            _currentTempCounter = previousTempCounter;
+
+            if (_currentFunctionSpecialization.Count > 0 &&
+                ReferenceEquals(_currentFunctionSpecialization.Peek(), specialization))
+                _currentFunctionSpecialization.Pop();
+
+            if (_currentFunctionName.Count > 0 && _currentFunctionName.Peek() == funcFullName)
+                _currentFunctionName.Pop();
+        }
     }
 
     public void VisitDefinitionsAndStatements(DefinitionsAndStatements DefandStmts)

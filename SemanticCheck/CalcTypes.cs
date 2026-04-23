@@ -23,6 +23,12 @@ public static class TypeChecker
         return ex.Visit(new CalcTypeVisitor(context));
     }
 
+    public static SemanticType CalcTypeVis(ExprNode ex, NameSpace context,
+        Func<string, SemanticType[], Position, SemanticType> functionReturnTypeResolver)
+    {
+        return ex.Visit(new CalcTypeVisitor(context, functionReturnTypeResolver));
+    }
+
     // Альтернативная реализация без визитора с использованием pattern matching
     public static SemanticType CalcType(ExprNode ex, NameSpace context)
     {
@@ -101,10 +107,13 @@ public static class TypeChecker
 public class CalcTypeVisitor : IVisitor<SemanticType>
 {
     private readonly NameSpace _context;
+    private readonly Func<string, SemanticType[], Position, SemanticType> _functionReturnTypeResolver;
 
-    public CalcTypeVisitor(NameSpace context)
+    public CalcTypeVisitor(NameSpace context,
+        Func<string, SemanticType[], Position, SemanticType> functionReturnTypeResolver = null)
     {
         _context = context;
+        _functionReturnTypeResolver = functionReturnTypeResolver;
     }
 
     public SemanticType CalcTypeVis(ExprNode ex) => ex.Visit(this);
@@ -247,7 +256,9 @@ public class CalcTypeVisitor : IVisitor<SemanticType>
             if (!TypeChecker.AssignComparable(paramType, argType))
                 CompilerExceptions.SemanticError($"Тип аргумента функции {argType} не соответствует типу формального параметра {paramType}", f.Name.Pos);
         }
-        
+        if (_functionReturnTypeResolver != null)
+            return _functionReturnTypeResolver(f.Name.Name, argTypes.ToArray(), f.Name.Pos);
+
         return specialization.ReturnType;
     }
 

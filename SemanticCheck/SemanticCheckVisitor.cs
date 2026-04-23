@@ -263,15 +263,15 @@ public class SemanticCheckVisitor : AutoVisitor
           
           
           
+          InferReturnTypeInSpecializationNamespace(p.Name.Name, specialization);
+
           // Если тело функции еще не проверено для этой специализации, проверяем его
           try
           {
               if (!specialization.BodyChecked && !IsStandardFunction(p.Name.Name))
               {
-                  var oldNamespace = _currentNamespace;
-                  _currentNamespace = specialization.NameSpace;
-                  CheckFunctionBodyWithSpecialization(p.Name.Name, specialization);
-                  _currentNamespace = oldNamespace;
+                  ExecuteInSpecializationNamespace(specialization,
+                      () => CheckFunctionBodyWithSpecialization(p.Name.Name, specialization));
               }
           }
           catch (CompilerExceptions.SemanticException ex)
@@ -309,6 +309,8 @@ public class SemanticCheckVisitor : AutoVisitor
                     $"Тип аргумента функции {argType} не соответствует типу формального параметра {paramType}",
                     f.Name.Pos);
         }
+
+        InferReturnTypeInSpecializationNamespace(f.Name.Name, specialization);
         
         if (specialization.ReturnType == SemanticType.NoType)
         {
@@ -322,10 +324,8 @@ public class SemanticCheckVisitor : AutoVisitor
         {
             if (!specialization.BodyChecked && !IsStandardFunction(f.Name.Name))
             {
-                var oldNamespace = _currentNamespace;
-                _currentNamespace = specialization.NameSpace;
-                CheckFunctionBodyWithSpecialization(f.Name.Name, specialization);
-                _currentNamespace = oldNamespace;
+                ExecuteInSpecializationNamespace(specialization,
+                    () => CheckFunctionBodyWithSpecialization(f.Name.Name, specialization));
             }
         }
         catch (CompilerExceptions.SemanticException ex)
@@ -338,12 +338,26 @@ public class SemanticCheckVisitor : AutoVisitor
         f.SpecializationId = specialization.SpecializationId;
     }
 
-    private void InferReturnType(string functionName, FunctionSpecialization specialization)
+    private SemanticType InferReturnType(string functionName, FunctionSpecialization specialization)
     {
+        if (specialization.State is FunctionSpecializationState.Inferred
+            or FunctionSpecializationState.Checking
+            or FunctionSpecializationState.Checked)
+            return specialization.ReturnType;
+
+        if (specialization.State == FunctionSpecializationState.Failed)
+            return SemanticType.BadType;
+
+        if (specialization.State == FunctionSpecializationState.Inferring)
+            return SemanticType.UnknownType;
+
+        if (IsStandardFunction(functionName))
+            return specialization.ReturnType;
+
         if (!FunctionTable.TryGetValue(functionName, out var functionDef))
         {
             CompilerExceptions.SemanticError($"Не найдено определение функции '{functionName}'", new Position(0, 0));
-            return;
+            return SemanticType.BadType;
         }
 
         var definition = specialization.Definition ?? functionDef.Definition;
@@ -352,38 +366,94 @@ public class SemanticCheckVisitor : AutoVisitor
 
         if (definition.IsReturnTypeDeclared)
         {
-            specialization.ReturnType = definition.ReturnType;
-            specialization.State = FunctionSpecializationState.Inferred;
-            ValidateReturnTypes(definition.Body, definition.ReturnType, definition.Pos);
-            return;
+            try
+            {
+                specialization.ReturnType = definition.ReturnType;
+                specialization.State = FunctionSpecializationState.Inferred;
+                ValidateReturnTypes(definition.Body, definition.ReturnType, definition.Pos);
+                return specialization.ReturnType;
+            }
+            catch
+            {
+                specialization.ReturnType = SemanticType.BadType;
+                specialization.State = FunctionSpecializationState.Failed;
+                throw;
+            }
         }
 
         specialization.State = FunctionSpecializationState.Inferring;
         specialization.ReturnType = SemanticType.UnknownType;
 
-        var returnTypes = new List<SemanticType>();
-        CollectReturnTypes(
-            functionDef.IsTemplateFunction
-                ? functionDef.Definition.Body
-                : definition.Body,
-            returnTypes);
-
-        // Выводим тип возвращаемого значения
-        if (returnTypes.Count > 0)
+        try
         {
-            // Находим общий тип всех return statements
-            var inferredReturnType = returnTypes[0];
-            for (var i = 1; i < returnTypes.Count; i++)
-                inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
-            specialization.ReturnType = inferredReturnType;
-        }
-        else
-        {
-            // Если нет return statements, то тип NoType
-            specialization.ReturnType = SemanticType.NoType;
-        }
+            var returnTypes = new List<SemanticType>();
+            CollectReturnTypes(
+                functionDef.IsTemplateFunction
+                    ? functionDef.Definition.Body
+                    : definition.Body,
+                returnTypes);
 
-        specialization.State = FunctionSpecializationState.Inferred;
+            // Выводим тип возвращаемого значения
+            if (returnTypes.Count > 0)
+            {
+                // Находим общий тип всех return statements
+                var inferredReturnType = returnTypes[0];
+                for (var i = 1; i < returnTypes.Count; i++)
+                    inferredReturnType = GetMoreGeneralType(inferredReturnType, returnTypes[i]);
+                specialization.ReturnType = inferredReturnType;
+            }
+            else
+            {
+                // Если нет return statements, то тип NoType
+                specialization.ReturnType = SemanticType.NoType;
+            }
+
+            specialization.State = FunctionSpecializationState.Inferred;
+            return specialization.ReturnType;
+        }
+        catch
+        {
+            specialization.ReturnType = SemanticType.BadType;
+            specialization.State = FunctionSpecializationState.Failed;
+            throw;
+        }
+    }
+
+    private SemanticType ResolveReturnTypeForInference(string functionName, SemanticType[] argTypes, Position position)
+    {
+        var specialization = SymbolTree.ResolveCallSpecialization(functionName, argTypes, position);
+        return InferReturnTypeInSpecializationNamespace(functionName, specialization);
+    }
+
+    private SemanticType InferReturnTypeInSpecializationNamespace(string functionName, FunctionSpecialization specialization)
+    {
+        if (IsStandardFunction(functionName))
+            return InferReturnType(functionName, specialization);
+
+        var oldNamespace = _currentNamespace;
+        _currentNamespace = specialization.NameSpace ?? _currentNamespace;
+        try
+        {
+            return InferReturnType(functionName, specialization);
+        }
+        finally
+        {
+            _currentNamespace = oldNamespace;
+        }
+    }
+
+    private void ExecuteInSpecializationNamespace(FunctionSpecialization specialization, Action action)
+    {
+        var oldNamespace = _currentNamespace;
+        _currentNamespace = specialization.NameSpace ?? _currentNamespace;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _currentNamespace = oldNamespace;
+        }
     }
 
     private void CheckFunctionBody(FunctionSpecialization specialization, StatementNode body)
@@ -393,8 +463,17 @@ public class SemanticCheckVisitor : AutoVisitor
 
         specialization.State = FunctionSpecializationState.Checking;
         specialization.BodyChecked = true;
-        body.VisitP(this);
-        specialization.State = FunctionSpecializationState.Checked;
+        try
+        {
+            body.VisitP(this);
+            specialization.State = FunctionSpecializationState.Checked;
+        }
+        catch
+        {
+            specialization.State = FunctionSpecializationState.Failed;
+            specialization.BodyChecked = false;
+            throw;
+        }
     }
     
     private void CheckFunctionBodyWithSpecialization(string functionName, FunctionSpecialization specialization)
@@ -432,7 +511,7 @@ public class SemanticCheckVisitor : AutoVisitor
             if (returnNode.Expr != null)
             {
                 // Вычисляем тип выражения в return
-                var returnType = CalcTypeVis(returnNode.Expr, _currentNamespace);
+                var returnType = CalcTypeVis(returnNode.Expr, _currentNamespace, ResolveReturnTypeForInference);
                 // if (returnTypes.Count == 0)
                 //     CurrentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
                 returnTypes.Add(returnType);
@@ -474,7 +553,7 @@ public class SemanticCheckVisitor : AutoVisitor
         
         if (returnNode.Expr != null)
         {
-            actualReturnType = CalcTypeVis(returnNode.Expr, _currentNamespace);
+            actualReturnType = CalcTypeVis(returnNode.Expr, _currentNamespace, ResolveReturnTypeForInference);
             
             // Проверяем совместимость с ожидаемым типом
             if (!AreTypesCompatible(actualReturnType, expectedReturnType))

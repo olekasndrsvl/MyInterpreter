@@ -358,6 +358,7 @@ public static class SymbolTree
         printFunc.FindOrCreateSpecialization(new[] { SemanticType.AnyType }).ReturnType = SemanticType.NoType;
         printFunc.FindOrCreateSpecialization(new[] { SemanticType.IntType }).ReturnType = SemanticType.NoType;
         printFunc.FindOrCreateSpecialization(new[] { SemanticType.DoubleType }).ReturnType = SemanticType.NoType;
+        printFunc.FindOrCreateSpecialization(new[] { SemanticType.BoolType }).ReturnType = SemanticType.NoType;
 
         // Main
         var mainFunc = new FunctionInfo();
