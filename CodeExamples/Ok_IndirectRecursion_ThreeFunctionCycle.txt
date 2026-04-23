@@ -1,0 +1,23 @@
+def a(n) {
+    if n <= 0 then
+        return 0;
+    return b(n - 1)
+};
+
+def b(n) {
+    if n <= 0 then
+        return 1;
+    return c(n - 1)
+};
+
+def c(n) {
+    if n <= 0 then
+        return 2;
+    return a(n - 1)
+}
+
+{
+    print(a(8));
+    print(b(8));
+    print(c(8))
+}

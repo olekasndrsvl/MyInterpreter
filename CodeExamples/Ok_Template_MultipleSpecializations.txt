@@ -1,0 +1,12 @@
+def choose(flag, x, y) {
+    if flag == 0 then
+        return x
+    else
+        return y
+}
+
+{
+    print(choose(0, 10, 20));
+    print(choose(1, 1.5, 2.5));
+    print(choose(0, 3, 4.5))
+}

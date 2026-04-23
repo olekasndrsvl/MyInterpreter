@@ -1,0 +1,11 @@
+def first(n) {
+    return second(n)
+};
+
+def second(n) {
+    return n + 1
+}
+
+{
+    print(first(10))
+}

@@ -1,0 +1,16 @@
+def down(x) {
+    if x <= 0.0 then
+        return 0.0;
+    return mirror(x - 1.0)
+};
+
+def mirror(x) {
+    if x <= 1.0 then
+        return x;
+    return down(x - 1.0)
+}
+
+{
+    print(down(4.0));
+    print(mirror(4.0))
+}

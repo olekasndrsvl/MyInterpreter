@@ -1,0 +1,17 @@
+def even(integer: n) : bool {
+    if n == 0 then
+        return 2 > 1
+    else
+        return odd(n < 3)
+};
+
+def odd(integer: n) : bool {
+    if n == 0 then
+        return 1 > 2
+    else
+        return even(n - 1)
+}
+
+{
+    print(even(4))
+}

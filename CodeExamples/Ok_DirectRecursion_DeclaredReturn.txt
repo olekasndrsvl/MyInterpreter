@@ -1,0 +1,9 @@
+def sumTo(integer: n) : integer {
+    if n <= 0 then
+        return 0;
+    return n + sumTo(n - 1)
+}
+
+{
+    print(sumTo(10))
+}

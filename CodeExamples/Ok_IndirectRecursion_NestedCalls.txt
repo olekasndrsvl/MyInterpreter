@@ -1,0 +1,15 @@
+def ping(n) {
+    if n <= 0 then
+        return 1;
+    return pong(n - 1) + pong(n - 2)
+};
+
+def pong(n) {
+    if n <= 1 then
+        return n;
+    return ping(n - 1)
+}
+
+{
+    print(ping(4))
+}

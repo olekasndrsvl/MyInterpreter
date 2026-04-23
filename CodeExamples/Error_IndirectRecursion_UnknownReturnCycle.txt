@@ -1,0 +1,11 @@
+def a(n) {
+    return b(n)
+};
+
+def b(n) {
+    return a(n)
+}
+
+{
+    print(a(1))
+}

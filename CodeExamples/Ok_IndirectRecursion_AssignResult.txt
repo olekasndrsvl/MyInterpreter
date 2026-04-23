@@ -1,0 +1,18 @@
+def even(n) {
+    if n == 0 then
+        return 2 > 1
+    else
+        return odd(n - 1)
+};
+
+def odd(n) {
+    if n == 0 then
+        return 1 > 2
+    else
+        return even(n - 1)
+}
+
+{
+    var result = even(6);
+    print(result)
+}
