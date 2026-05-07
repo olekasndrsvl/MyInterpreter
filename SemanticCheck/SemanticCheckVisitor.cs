@@ -370,7 +370,8 @@ public class SemanticCheckVisitor : AutoVisitor
             {
                 specialization.ReturnType = definition.ReturnType;
                 specialization.State = FunctionSpecializationState.Inferred;
-                ValidateReturnTypes(definition.Body, definition.ReturnType, definition.Pos);
+                ExecuteInTemporaryNamespace("return_type_validation",
+                    () => ValidateReturnTypes(definition.Body, definition.ReturnType, definition.Pos));
                 return specialization.ReturnType;
             }
             catch
@@ -387,11 +388,12 @@ public class SemanticCheckVisitor : AutoVisitor
         try
         {
             var returnTypes = new List<SemanticType>();
-            CollectReturnTypes(
-                functionDef.IsTemplateFunction
-                    ? functionDef.Definition.Body
-                    : definition.Body,
-                returnTypes);
+            ExecuteInTemporaryNamespace("return_type_inference",
+                () => CollectReturnTypes(
+                    functionDef.IsTemplateFunction
+                        ? functionDef.Definition.Body
+                        : definition.Body,
+                    returnTypes));
 
             // Выводим тип возвращаемого значения
             if (returnTypes.Count > 0)
@@ -504,118 +506,236 @@ public class SemanticCheckVisitor : AutoVisitor
         
     }
 
-    private void CollectReturnTypes(StatementNode node, List<SemanticType> returnTypes)
+    private void ExecuteInTemporaryNamespace(string name, Action action)
     {
-        if (node is ReturnNode returnNode)
+        var oldNamespace = _currentNamespace;
+        _currentNamespace = new LightWeightNameSpace
         {
-            if (returnNode.Expr != null)
-            {
-                // Вычисляем тип выражения в return
-                var returnType = CalcTypeVis(returnNode.Expr, _currentNamespace, ResolveReturnTypeForInference);
-                // if (returnTypes.Count == 0)
-                //     CurrentCheckingFunctionSpecialization.Peek().ReturnType = returnType;
-                returnTypes.Add(returnType);
-            }
-            else
-            {
-                returnTypes.Add(SemanticType.NoType);
-            }
+            Parent = oldNamespace,
+            Name = name
+        };
+
+        try
+        {
+            action();
         }
-        else if (node is StatementListNode statementList)
+        finally
         {
-            foreach (var stmt in statementList.lst) CollectReturnTypes(stmt, returnTypes);
-        }
-        else if (node is BlockNode blcNode)
-        {
-            foreach (var stmt in blcNode.lst.lst) CollectReturnTypes(stmt, returnTypes);
-        }
-        else if (node is IfNode ifNode)
-        {
-            CollectReturnTypes(ifNode.ThenStat, returnTypes);
-            if (ifNode.ElseStat != null) CollectReturnTypes(ifNode.ElseStat, returnTypes);
-        }
-        else if (node is WhileNode whileNode)
-        {
-            CollectReturnTypes(whileNode.Stat, returnTypes);
-        }
-        else if (node is ForNode forNode)
-        {
-            CollectReturnTypes(forNode.Stat, returnTypes);
+            _currentNamespace = oldNamespace;
         }
     }
 
+    private SemanticType CalcTypeForReturnInference(ExprNode expr)
+    {
+        return CalcTypeVis(expr, _currentNamespace, ResolveReturnTypeForInference);
+    }
+
+    private void AddVariableForReturnInference(VarAssignNode vass)
+    {
+        var typ = CalcTypeForReturnInference(vass.Expr);
+        try
+        {
+            _currentNamespace.AddVariable(vass.Ident.Name, typ);
+        }
+        catch (InvalidOperationException)
+        {
+            CompilerExceptions.SemanticError(
+                $"Переменная {vass.Ident.Name} уже объявлена!", vass.Ident.Pos);
+        }
+
+        vass.Ident.ValueType = typ;
+    }
+
+    private void ValidateAssignmentForReturnInference(AssignNode ass)
+    {
+        var variable = _currentNamespace.LookupVariable(ass.Ident.Name);
+        if (variable == null)
+        {
+            CompilerExceptions.SemanticError($"Переменная с именем {ass.Ident.Name} не объявлена!", ass.Ident.Pos);
+            return;
+        }
+
+        if (FunctionTable.ContainsKey(ass.Ident.Name) || variable.Kind == KindType.FuncName)
+            CompilerExceptions.SemanticError($"Имени функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
+
+        var typ = CalcTypeForReturnInference(ass.Expr);
+        if (!AssignComparable(variable.Type, typ))
+            CompilerExceptions.SemanticError(
+                $"Переменной {ass.Ident.Name} типа {variable.Type} нельзя присвоить выражение типа {typ}",
+                ass.Ident.Pos);
+    }
+
+    private void ValidateAssignOpForReturnInference(AssignOpNode ass)
+    {
+        var variable = _currentNamespace.LookupVariable(ass.Ident.Name);
+        if (variable == null)
+        {
+            CompilerExceptions.SemanticError($"Переменная {ass.Ident.Name} не определена", ass.Ident.Pos);
+            return;
+        }
+
+        if (variable.Kind == KindType.FuncName)
+            CompilerExceptions.SemanticError(
+                $"Имени стандартной функции {ass.Ident.Name} нельзя присвоить значение", ass.Ident.Pos);
+
+        var typ = CalcTypeForReturnInference(ass.Expr);
+        var idtyp = variable.Type;
+
+        if (idtyp != SemanticType.IntType && idtyp != SemanticType.DoubleType && idtyp != SemanticType.AnyType)
+            CompilerExceptions.SemanticError($"Операция {ass.Op} не определена для типа {idtyp}", ass.Ident.Pos);
+
+        if (idtyp == SemanticType.IntType && ass.Op == '/')
+            CompilerExceptions.SemanticError($"Операция {ass.Op} не определена для типа {idtyp}", ass.Ident.Pos);
+
+        if (!AssignComparable(idtyp, typ))
+            CompilerExceptions.SemanticError(
+                $"Переменной {ass.Ident.Name} типа {idtyp} нельзя присвоить выражение типа {typ}", ass.Ident.Pos);
+    }
+
+    private void ValidateProcedureCallForReturnInference(ProcCallNode p)
+    {
+        var argTypes = new List<SemanticType>();
+        foreach (var arg in p.Pars.lst)
+            argTypes.Add(CalcTypeForReturnInference(arg));
+
+        var specialization = SymbolTree.ResolveCallSpecialization(p.Name.Name, argTypes.ToArray(), p.Pos);
+        for (var i = 0; i < specialization.ParameterTypes.Length; i++)
+        {
+            var argType = argTypes[i];
+            var paramType = specialization.ParameterTypes[i];
+
+            if (!AssignComparable(paramType, argType))
+                CompilerExceptions.SemanticError(
+                    $"Тип аргумента процедуры {argType} не соответствует типу формального параметра {paramType}",
+                    p.Name.Pos);
+        }
+
+        InferReturnTypeInSpecializationNamespace(p.Name.Name, specialization);
+        if (specialization.ReturnType != SemanticType.NoType)
+            CompilerExceptions.SemanticError("Попытка вызвать функцию " + p.Name.Name + " как процедуру", p.Name.Pos);
+
+        p.SpecializationId = specialization.SpecializationId;
+    }
+
+    private void ValidateConditionForReturnInference(ExprNode condition)
+    {
+        var typ = CalcTypeForReturnInference(condition);
+        if (typ != SemanticType.BoolType)
+            CompilerExceptions.SemanticError($"Ожидалось выражение логического типа, а встречено выражение типа {typ}",
+                condition.Pos);
+    }
+
+    private void AnalyzeReturnTypes(StatementNode node, List<SemanticType> returnTypes,
+        SemanticType expectedReturnType, Position funcPosition, bool validateExpectedType)
+    {
+        if (node is ReturnNode returnNode)
+        {
+            var actualReturnType = returnNode.Expr != null
+                ? CalcTypeForReturnInference(returnNode.Expr)
+                : SemanticType.NoType;
+
+            if (validateExpectedType && !AreTypesCompatible(actualReturnType, expectedReturnType))
+            {
+                CompilerExceptions.SemanticError(
+                    $"Несовместимый тип возвращаемого значения. Ожидалось: {expectedReturnType}, получено: {actualReturnType}",
+                    returnNode.Pos ?? funcPosition);
+            }
+            else if (!validateExpectedType)
+            {
+                returnTypes.Add(actualReturnType);
+            }
+
+            return;
+        }
+
+        if (node is VarAssignNode varAssign)
+        {
+            AddVariableForReturnInference(varAssign);
+            return;
+        }
+
+        if (node is AssignNode assign)
+        {
+            ValidateAssignmentForReturnInference(assign);
+            return;
+        }
+
+        if (node is AssignOpNode assignOp)
+        {
+            ValidateAssignOpForReturnInference(assignOp);
+            return;
+        }
+
+        if (node is ProcCallNode procCall)
+        {
+            ValidateProcedureCallForReturnInference(procCall);
+            return;
+        }
+
+        if (node is StatementListNode statementList)
+        {
+            foreach (var stmt in statementList.lst)
+                AnalyzeReturnTypes(stmt, returnTypes, expectedReturnType, funcPosition, validateExpectedType);
+            return;
+        }
+
+        if (node is BlockNode blcNode)
+        {
+            ExecuteInTemporaryNamespace("return_type_block",
+                () =>
+                {
+                    foreach (var stmt in blcNode.lst.lst)
+                        AnalyzeReturnTypes(stmt, returnTypes, expectedReturnType, funcPosition, validateExpectedType);
+                });
+            return;
+        }
+
+        if (node is IfNode ifNode)
+        {
+            ValidateConditionForReturnInference(ifNode.Condition);
+            ExecuteInTemporaryNamespace("return_type_if_then",
+                () => AnalyzeReturnTypes(ifNode.ThenStat, returnTypes, expectedReturnType, funcPosition,
+                    validateExpectedType));
+
+            if (ifNode.ElseStat != null)
+                ExecuteInTemporaryNamespace("return_type_if_else",
+                    () => AnalyzeReturnTypes(ifNode.ElseStat, returnTypes, expectedReturnType, funcPosition,
+                        validateExpectedType));
+            return;
+        }
+
+        if (node is WhileNode whileNode)
+        {
+            ValidateConditionForReturnInference(whileNode.Condition);
+            ExecuteInTemporaryNamespace("return_type_while",
+                () => AnalyzeReturnTypes(whileNode.Stat, returnTypes, expectedReturnType, funcPosition,
+                    validateExpectedType));
+            return;
+        }
+
+        if (node is ForNode forNode)
+        {
+            ExecuteInTemporaryNamespace("return_type_for",
+                () =>
+                {
+                    AddVariableForReturnInference(forNode.Counter);
+                    ValidateConditionForReturnInference(forNode.Condition);
+                    ValidateAssignOpForReturnInference(forNode.Increment);
+                    AnalyzeReturnTypes(forNode.Stat, returnTypes, expectedReturnType, funcPosition,
+                        validateExpectedType);
+                });
+        }
+    }
+
+    private void CollectReturnTypes(StatementNode node, List<SemanticType> returnTypes)
+    {
+        AnalyzeReturnTypes(node, returnTypes, SemanticType.NoType, node.Pos, false);
+    }
+
     private void ValidateReturnTypes(StatementNode node, SemanticType expectedReturnType, Position funcPosition)
-{
-    if (node is ReturnNode returnNode)
     {
-        // Получаем тип выражения в return (или NoType для return без значения)
-        SemanticType actualReturnType;
-        
-        if (returnNode.Expr != null)
-        {
-            actualReturnType = CalcTypeVis(returnNode.Expr, _currentNamespace, ResolveReturnTypeForInference);
-            
-            // Проверяем совместимость с ожидаемым типом
-            if (!AreTypesCompatible(actualReturnType, expectedReturnType))
-            {
-                string expectedStr = expectedReturnType.ToString();
-                string actualStr = actualReturnType.ToString();
-                
-                CompilerExceptions.SemanticError(
-                    $"Несовместимый тип возвращаемого значения. Ожидалось: {expectedStr}, получено: {actualStr}",
-                    returnNode.Pos ?? funcPosition);
-            }
-        }
-        else
-        {
-            // return без выражения
-            if (expectedReturnType != SemanticType.NoType)
-            {
-                CompilerExceptions.SemanticError(
-                    $"Функция должна возвращать значение типа {expectedReturnType}, " +
-                    "но обнаружен return без значения",
-                    returnNode.Pos ?? funcPosition);
-            }
-        }
+        AnalyzeReturnTypes(node, new List<SemanticType>(), expectedReturnType, funcPosition, true);
     }
-    else if (node is StatementListNode statementList)
-    {
-        foreach (var stmt in statementList.lst)
-        {
-            ValidateReturnTypes(stmt, expectedReturnType, funcPosition);
-        }
-    }
-    else if (node is BlockNode blcNode)
-    {
-        foreach (var stmt in blcNode.lst.lst)
-        {
-            ValidateReturnTypes(stmt, expectedReturnType, funcPosition);
-        }
-    }
-    else if (node is IfNode ifNode)
-    {
-        ValidateReturnTypes(ifNode.ThenStat, expectedReturnType, funcPosition);
-        if (ifNode.ElseStat != null)
-        {
-            ValidateReturnTypes(ifNode.ElseStat, expectedReturnType, funcPosition);
-        }
-        else
-        {
-            // Если нет else, то может не быть return в одной из веток
-            CheckAllPathsReturn(ifNode.ThenStat, expectedReturnType, ifNode.Pos ?? funcPosition);
-        }
-    }
-    else if (node is WhileNode whileNode)
-    {
-        ValidateReturnTypes(whileNode.Stat, expectedReturnType, funcPosition);
-        // Цикл может не выполниться, поэтому нужен return после цикла
-    }
-    else if (node is ForNode forNode)
-    {
-        ValidateReturnTypes(forNode.Stat, expectedReturnType, funcPosition);
-        // Цикл может не выполниться, поэтому нужен return после цикла
-    }
-}
     // Проверка, что все пути выполнения возвращают значение
     private void CheckAllPathsReturn(StatementNode node, SemanticType expectedReturnType, Position pos)
     {
